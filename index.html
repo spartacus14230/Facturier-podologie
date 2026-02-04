@@ -1776,6 +1776,32 @@
             min-height: 1.2rem;
             margin-top: 0.5rem;
         }
+
+        /* ===== FILTER BUTTONS ===== */
+        .filter-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        .filter-btn.active[data-filter="toutes"] {
+            background: var(--primary) !important;
+            color: white !important;
+        }
+
+        .filter-btn.active[data-filter="payees"] {
+            background: var(--success) !important;
+            color: white !important;
+        }
+
+        .filter-btn.active[data-filter="attente"] {
+            background: var(--warning) !important;
+            color: white !important;
+        }
+
+        .filter-btn.active[data-filter="retard"] {
+            background: var(--danger) !important;
+            color: white !important;
+        }
     </style>
 </head>
 <body>
@@ -1963,12 +1989,20 @@
                         </div>
                         <div class="stat-card">
                             <div class="stat-icon yellow">
+                                <i class="fas fa-clock"></i>
+                            </div>
+                            <div class="stat-info">
+                                <div class="stat-label">Factures en attente</div>
+                                <div class="stat-value" id="statAttente">0</div>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon red">
                                 <i class="fas fa-exclamation-triangle"></i>
                             </div>
                             <div class="stat-info">
-                                <div class="stat-label">Factures impayées</div>
-                                <div class="stat-value" id="statImpayees">3</div>
-                                <div class="stat-trend down">850€ à recouvrer</div>
+                                <div class="stat-label">Factures en retard</div>
+                                <div class="stat-value" id="statRetard">0</div>
                             </div>
                         </div>
                     </div>
@@ -2174,6 +2208,20 @@
                             </button>
                         </div>
                         <div class="card-body">
+                            <div class="filter-buttons" style="margin-bottom: 1.5rem; display: flex; gap: 0.75rem; flex-wrap: wrap;">
+                                <button class="filter-btn active" data-filter="toutes" onclick="filterFactures('toutes')" style="padding: 0.6rem 1.2rem; border: 2px solid var(--primary); background: var(--primary); color: white; border-radius: var(--radius-sm); font-weight: 600; cursor: pointer; transition: var(--transition); font-size: 0.9rem;">
+                                    <i class="fas fa-list"></i> Toutes
+                                </button>
+                                <button class="filter-btn" data-filter="payees" onclick="filterFactures('payees')" style="padding: 0.6rem 1.2rem; border: 2px solid var(--success); background: transparent; color: var(--success); border-radius: var(--radius-sm); font-weight: 600; cursor: pointer; transition: var(--transition); font-size: 0.9rem;">
+                                    <i class="fas fa-check-circle"></i> Payées
+                                </button>
+                                <button class="filter-btn" data-filter="attente" onclick="filterFactures('attente')" style="padding: 0.6rem 1.2rem; border: 2px solid var(--warning); background: transparent; color: var(--warning); border-radius: var(--radius-sm); font-weight: 600; cursor: pointer; transition: var(--transition); font-size: 0.9rem;">
+                                    <i class="fas fa-clock"></i> En attente
+                                </button>
+                                <button class="filter-btn" data-filter="retard" onclick="filterFactures('retard')" style="padding: 0.6rem 1.2rem; border: 2px solid var(--danger); background: transparent; color: var(--danger); border-radius: var(--radius-sm); font-weight: 600; cursor: pointer; transition: var(--transition); font-size: 0.9rem;">
+                                    <i class="fas fa-exclamation-triangle"></i> En retard
+                                </button>
+                            </div>
                             <div class="table-container">
                                 <table class="table">
                                     <thead>
@@ -3298,28 +3346,20 @@
             document.getElementById('statRdvMois').textContent = rdvsMois;
             document.getElementById('statClients').textContent = clients.length;
             
-            const facturesImpayees = factures.filter(f => f.statut === 'retard' || f.statut === 'attente');
-            const impayees = facturesImpayees.length;
-            document.getElementById('statImpayees').textContent = impayees;
-            
-            // Calculer le montant total impayé
-            const montantImpaye = facturesImpayees.reduce((sum, f) => {
-                return sum + f.lignes.reduce((s, l) => s + (l.qty * l.prix), 0);
-            }, 0);
-            const trendImpayees = document.querySelector('#statImpayees').closest('.stat-info').querySelector('.stat-trend');
-            if (trendImpayees) {
-                trendImpayees.innerHTML = `${montantImpaye.toFixed(0)}€ à recouvrer`;
-            }
+            const facturesAttente = factures.filter(f => f.statut === 'attente').length;
+            const facturesRetard = factures.filter(f => f.statut === 'retard').length;
+            document.getElementById('statAttente').textContent = facturesAttente;
+            document.getElementById('statRetard').textContent = facturesRetard;
             
             // Calculer le CA du mois (factures payées ce mois)
             const facturesPayeesCeMois = factures.filter(f => {
                 if (f.statut !== 'payee') return false;
-                const datePaiement = f.datePaiement || f.date;
-                const d = new Date(datePaiement);
+                const d = new Date(f.date);
                 return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
             });
             const caMois = facturesPayeesCeMois.reduce((sum, f) => {
-                return sum + f.lignes.reduce((s, l) => s + (l.qty * l.prix), 0);
+                const total = f.totalTTC || f.lignes.reduce((s, l) => s + (l.qty * l.prix), 0);
+                return sum + total;
             }, 0);
             document.getElementById('statCaMois').textContent = caMois.toFixed(0) + '€';
             
@@ -3328,12 +3368,12 @@
             const lastYear = thisMonth === 0 ? thisYear - 1 : thisYear;
             const facturesPayeesMoisDernier = factures.filter(f => {
                 if (f.statut !== 'payee') return false;
-                const datePaiement = f.datePaiement || f.date;
-                const d = new Date(datePaiement);
+                const d = new Date(f.date);
                 return d.getMonth() === lastMonth && d.getFullYear() === lastYear;
             });
             const caMoisDernier = facturesPayeesMoisDernier.reduce((sum, f) => {
-                return sum + f.lignes.reduce((s, l) => s + (l.qty * l.prix), 0);
+                const total = f.totalTTC || f.lignes.reduce((s, l) => s + (l.qty * l.prix), 0);
+                return sum + total;
             }, 0);
             
             const trendCa = document.querySelector('#statCaMois').closest('.stat-info').querySelector('.stat-trend');
@@ -3478,6 +3518,80 @@
             document.getElementById('factAttente').textContent = factures.filter(f => f.statut === 'attente').length;
             document.getElementById('factRetard').textContent = factures.filter(f => f.statut === 'retard').length;
 
+            // Appliquer le filtre actif
+            let filteredFactures = sorted;
+            if (currentFactureFilter === 'payees') {
+                filteredFactures = sorted.filter(f => f.statut === 'payee');
+            } else if (currentFactureFilter === 'attente') {
+                filteredFactures = sorted.filter(f => f.statut === 'attente');
+            } else if (currentFactureFilter === 'retard') {
+                filteredFactures = sorted.filter(f => f.statut === 'retard');
+            }
+
+            tbody.innerHTML = filteredFactures.map(f => {
+                const client = clients.find(c => c.id == f.clientId);
+                const total = f.totalTTC || f.lignes.reduce((sum, l) => sum + (l.qty * l.prix), 0);
+                const isLate = f.statut === 'retard';
+                const joursRetard = f.dateEcheance ? Math.floor((new Date() - new Date(f.dateEcheance)) / (1000 * 60 * 60 * 24)) : 0;
+                
+                return `
+                    <tr data-facture-id="${f.id}" class="${isLate ? 'row-danger' : ''}">
+                        <td><strong>${f.numero}</strong></td>
+                        <td>${formatDateFr(f.date)}</td>
+                        <td>${client?.nom || 'N/A'} ${client?.prenom || ''}</td>
+                        <td class="${isLate ? 'text-danger' : ''}">${f.dateEcheance ? formatDateFr(f.dateEcheance) : '-'} ${joursRetard > 15 ? '⚠️' : ''}</td>
+                        <td><strong>${total.toFixed(2)}€</strong></td>
+                        <td>${f.modeReglement || '-'}</td>
+                        <td>
+                            <button class="badge-btn badge-${getStatutBadge(f.statut)}" onclick="toggleStatutFacture(${f.id})" title="Cliquer pour changer le statut">
+                                ${getStatutLabel(f.statut)}
+                            </button>
+                        </td>
+                        <td>
+                            <button class="action-btn" onclick="viewFacture(${f.id})" title="Voir">👁️</button>
+                            <button class="action-btn" onclick="printFacture(${f.id})" title="Imprimer">🖨️</button>
+                            <button class="action-btn delete" onclick="deleteFacture(${f.id})" title="Supprimer">🗑️</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // ===== FILTER FACTURES =====
+        let currentFactureFilter = 'toutes';
+
+        function filterFactures(filter) {
+            currentFactureFilter = filter;
+            
+            // Mettre à jour l'apparence des boutons
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.dataset.filter === filter) {
+                    btn.classList.add('active');
+                }
+            });
+
+            // Filtrer et afficher les factures
+            const tbody = document.getElementById('facturesTableBody');
+            let filteredFactures = [...factures];
+
+            // Mettre à jour les statuts avant de filtrer
+            updateFacturesStatuts();
+
+            // Appliquer le filtre
+            if (filter === 'payees') {
+                filteredFactures = filteredFactures.filter(f => f.statut === 'payee');
+            } else if (filter === 'attente') {
+                filteredFactures = filteredFactures.filter(f => f.statut === 'attente');
+            } else if (filter === 'retard') {
+                filteredFactures = filteredFactures.filter(f => f.statut === 'retard');
+            }
+            // Si 'toutes', on garde toutes les factures
+
+            // Trier par numéro
+            const sorted = filteredFactures.sort((a, b) => b.numero.localeCompare(a.numero));
+
+            // Afficher les factures filtrées
             tbody.innerHTML = sorted.map(f => {
                 const client = clients.find(c => c.id == f.clientId);
                 const total = f.totalTTC || f.lignes.reduce((sum, l) => sum + (l.qty * l.prix), 0);
@@ -3505,6 +3619,11 @@
                     </tr>
                 `;
             }).join('');
+
+            // Mettre à jour les compteurs dans les cards
+            document.getElementById('factPayees').textContent = factures.filter(f => f.statut === 'payee').length;
+            document.getElementById('factAttente').textContent = factures.filter(f => f.statut === 'attente').length;
+            document.getElementById('factRetard').textContent = factures.filter(f => f.statut === 'retard').length;
         }
 
         // ===== CALENDAR =====
@@ -4341,7 +4460,7 @@
             const anneeSelect = document.getElementById('anneeUrssaf');
             
             // Remplir le select des années
-            const annees = [...new Set(factures.map(f => new Date(f.datePaiement || f.date).getFullYear()))].sort((a, b) => b - a);
+            const annees = [...new Set(factures.map(f => new Date(f.date).getFullYear()))].sort((a, b) => b - a);
             const currentYear = new Date().getFullYear();
             if (!annees.includes(currentYear)) annees.unshift(currentYear);
             
@@ -4353,8 +4472,7 @@
             // Filtrer les factures payées pour l'année sélectionnée
             const facturesPayees = factures.filter(f => {
                 if (f.statut !== 'payee') return false;
-                const datePaiement = f.datePaiement || f.date;
-                return new Date(datePaiement).getFullYear() === selectedYear;
+                return new Date(f.date).getFullYear() === selectedYear;
             });
             
             // Calculer le CA par mois
@@ -4363,8 +4481,7 @@
             const nbFacturesMensuel = Array(12).fill(0);
             
             facturesPayees.forEach(f => {
-                const datePaiement = f.datePaiement || f.date;
-                const mois = new Date(datePaiement).getMonth();
+                const mois = new Date(f.date).getMonth();
                 const total = f.totalTTC || f.lignes.reduce((sum, l) => sum + (l.qty * l.prix), 0);
                 caMensuel[mois] += total;
                 nbFacturesMensuel[mois]++;
