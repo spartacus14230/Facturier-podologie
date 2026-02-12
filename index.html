@@ -3493,16 +3493,23 @@ function createFactureFromRdv(rdvId) {
   alert('Facture '+data.numero+' créée pour '+r.client+' ('+euro(r.tarif)+')');
 }
 
-function openRdvModal(id) {
+function openRdvModal(id, prefillDate) {
   const r = id ? DB.rdv.find(x=>x.id===id) : null;
+  const isEdit = !!r;
   const clientOpts = DB.clients.map(c=>`<option value="${c.nom}" ${r&&r.client===c.nom?'selected':''}>${c.nom}</option>`).join('');
-  openModal(r?'Modifier le RDV':'Nouveau rendez-vous', `
-    <div style="border-bottom:1px solid var(--border);padding-bottom:16px;margin-bottom:16px">
-      <div style="font-weight:700;color:var(--accent);margin-bottom:12px">👤 Client</div>
-      <div class="form-group">
-        <label class="form-label">Sélectionner un client existant *</label>
-        <select id="m-r-client" onchange="onRdvClientChange()"><option value="">-- Sélectionner --</option>${clientOpts}<option value="__nouveau__">＋ Nouveau client...</option></select>
+  
+  // En mode édition, le client est affiché en lecture avec possibilité de changer
+  const clientSection = isEdit ? `
+    <div style="display:flex;align-items:center;gap:12px;padding:12px;background:var(--bg);border-radius:8px;margin-bottom:16px">
+      <div style="width:40px;height:40px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:16px">${(r.client||'?')[0]}</div>
+      <div style="flex:1">
+        <div style="font-weight:700;font-size:15px">${r.client}</div>
+        <div style="font-size:12px;color:var(--text-light)">${r.adresse || 'Pas d\'adresse'}</div>
       </div>
+      <button class="btn btn-secondary btn-sm" onclick="document.getElementById('m-r-client-change').style.display=document.getElementById('m-r-client-change').style.display==='none'?'block':'none'" style="font-size:11px">Changer</button>
+    </div>
+    <div id="m-r-client-change" style="display:none;margin-bottom:16px">
+      <select id="m-r-client" onchange="onRdvClientChange()"><option value="">-- Sélectionner --</option>${clientOpts}<option value="__nouveau__">＋ Nouveau client...</option></select>
       <div id="m-r-new-client" style="display:none;background:var(--bg);border-radius:8px;padding:12px;margin-top:8px">
         <div style="font-size:12px;font-weight:600;color:var(--accent);margin-bottom:8px">Créer un nouveau client</div>
         <div class="form-row">
@@ -3513,33 +3520,68 @@ function openRdvModal(id) {
           <div class="form-group"><label class="form-label" style="font-size:12px">Téléphone</label><input id="m-r-nc-tel" placeholder="06 XX XX XX XX" style="font-size:13px"></div>
           <div class="form-group"><label class="form-label" style="font-size:12px">Email</label><input id="m-r-nc-email" type="email" placeholder="email@exemple.fr" style="font-size:13px"></div>
         </div>
-        <div class="form-group"><label class="form-label" style="font-size:12px">Adresse (rue)</label><input id="m-r-nc-rue" placeholder="Numéro et rue" style="font-size:13px"></div>
+        <div class="form-group"><label class="form-label" style="font-size:12px">Adresse</label><input id="m-r-nc-rue" placeholder="Numéro et rue" style="font-size:13px"></div>
         <div class="form-row" style="grid-template-columns:120px 1fr">
-          <div class="form-group"><label class="form-label" style="font-size:12px">Code postal</label><input id="m-r-nc-cp" placeholder="14230" maxlength="5" style="font-size:13px" oninput="rechercherVilleParCP(this.value, 'm-r-nc-ville')"></div>
-          <div class="form-group"><label class="form-label" style="font-size:12px">Ville</label>
-            <div style="position:relative">
-              <input id="m-r-nc-ville" placeholder="LONGUEVILLE" style="font-size:13px">
-              <div id="m-r-nc-ville-list" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:999;background:var(--card);border:1px solid var(--border);border-radius:0 0 8px 8px;max-height:120px;overflow:auto;box-shadow:0 4px 12px rgba(0,0,0,0.15)"></div>
-            </div>
-          </div>
+          <div class="form-group"><label class="form-label" style="font-size:12px">CP</label><input id="m-r-nc-cp" placeholder="14230" maxlength="5" style="font-size:13px" oninput="rechercherVilleParCP(this.value, 'm-r-nc-ville')"></div>
+          <div class="form-group"><label class="form-label" style="font-size:12px">Ville</label><div style="position:relative"><input id="m-r-nc-ville" placeholder="LONGUEVILLE" style="font-size:13px"><div id="m-r-nc-ville-list" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:999;background:var(--card);border:1px solid var(--border);border-radius:0 0 8px 8px;max-height:120px;overflow:auto;box-shadow:0 4px 12px rgba(0,0,0,0.15)"></div></div></div>
         </div>
       </div>
     </div>
+  ` : `
+    <div class="form-group" style="margin-bottom:16px">
+      <label class="form-label">Client *</label>
+      <select id="m-r-client" onchange="onRdvClientChange()"><option value="">-- Sélectionner --</option>${clientOpts}<option value="__nouveau__">＋ Nouveau client...</option></select>
+      <div id="m-r-new-client" style="display:none;background:var(--bg);border-radius:8px;padding:12px;margin-top:8px">
+        <div style="font-size:12px;font-weight:600;color:var(--accent);margin-bottom:8px">Créer un nouveau client</div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label" style="font-size:12px">Nom *</label><input id="m-r-nc-nom" placeholder="NOM" style="font-size:13px;text-transform:uppercase"></div>
+          <div class="form-group"><label class="form-label" style="font-size:12px">Prénom</label><input id="m-r-nc-prenom" placeholder="Prénom" style="font-size:13px"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label" style="font-size:12px">Téléphone</label><input id="m-r-nc-tel" placeholder="06 XX XX XX XX" style="font-size:13px"></div>
+          <div class="form-group"><label class="form-label" style="font-size:12px">Email</label><input id="m-r-nc-email" type="email" placeholder="email@exemple.fr" style="font-size:13px"></div>
+        </div>
+        <div class="form-group"><label class="form-label" style="font-size:12px">Adresse</label><input id="m-r-nc-rue" placeholder="Numéro et rue" style="font-size:13px"></div>
+        <div class="form-row" style="grid-template-columns:120px 1fr">
+          <div class="form-group"><label class="form-label" style="font-size:12px">CP</label><input id="m-r-nc-cp" placeholder="14230" maxlength="5" style="font-size:13px" oninput="rechercherVilleParCP(this.value, 'm-r-nc-ville')"></div>
+          <div class="form-group"><label class="form-label" style="font-size:12px">Ville</label><div style="position:relative"><input id="m-r-nc-ville" placeholder="LONGUEVILLE" style="font-size:13px"><div id="m-r-nc-ville-list" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:999;background:var(--card);border:1px solid var(--border);border-radius:0 0 8px 8px;max-height:120px;overflow:auto;box-shadow:0 4px 12px rgba(0,0,0,0.15)"></div></div></div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Statut toggle pour l'édition
+  const statutSection = isEdit ? `
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <button class="btn ${r.statut==='termine'?'btn-primary':'btn-secondary'} btn-sm" onclick="document.getElementById('m-r-statut').value='termine';this.classList.add('btn-primary');this.classList.remove('btn-secondary');this.nextElementSibling.classList.remove('btn-primary');this.nextElementSibling.classList.add('btn-secondary')" style="flex:1;font-size:13px">✓ Terminé</button>
+      <button class="btn ${r.statut!=='termine'?'btn-primary':'btn-secondary'} btn-sm" onclick="document.getElementById('m-r-statut').value='planifie';this.classList.add('btn-primary');this.classList.remove('btn-secondary');this.previousElementSibling.classList.remove('btn-primary');this.previousElementSibling.classList.add('btn-secondary')" style="flex:1;font-size:13px">📅 Planifié</button>
+    </div>
+    <input type="hidden" id="m-r-statut" value="${r.statut||'planifie'}">
+  ` : '';
+
+  const defaultDate = prefillDate || (r ? isoDate(r.date) : today());
+
+  openModal(isEdit ? '✏️ Modifier le RDV' : '📅 Nouveau rendez-vous', `
+    ${clientSection}
+    ${statutSection}
     <div class="form-row">
-      <div class="form-group"><label class="form-label">Date *</label><input type="date" id="m-r-date" value="${r?isoDate(r.date):today()}"></div>
+      <div class="form-group"><label class="form-label">Date *</label><input type="date" id="m-r-date" value="${defaultDate}"></div>
       <div class="form-group"><label class="form-label">Heure</label><input type="time" id="m-r-heure" value="${r?r.heure:'14:00'}"></div>
     </div>
     <div class="form-row">
       <div class="form-group"><label class="form-label">Durée (min)</label><input type="number" id="m-r-duree" value="${r?r.duree:60}"></div>
       <div class="form-group"><label class="form-label">Type</label><select id="m-r-type">
-        ${['Consultation','Parage','Urgence','Suivi'].map(t=>`<option ${r&&r.type===t?'selected':''}>${t}</option>`).join('')}
+        ${['Consultation','Parage','Urgence','Suivi','Déferrage'].map(t=>`<option ${r&&r.type===t?'selected':''}>${t}</option>`).join('')}
       </select></div>
     </div>
     <div class="form-group"><label class="form-label">Adresse du RDV</label><input id="m-r-adresse" value="${r?r.adresse:''}"></div>
     <div class="form-group"><label class="form-label">Tarif (€)</label><input type="number" step="0.01" id="m-r-tarif" value="${r?r.tarif:''}"></div>
-    <div class="modal-actions">
-      <button class="btn btn-secondary" onclick="closeModal()">Annuler</button>
-      <button class="btn btn-primary" onclick="saveRdv('${id||''}')">💾 Enregistrer</button>
+    <div class="modal-actions" style="display:flex;gap:8px;justify-content:space-between;align-items:center">
+      <div>${isEdit ? '<button class="btn btn-sm" style="background:#fef2f2;color:var(--danger);border:1px solid var(--danger)" onclick="if(confirm(\'Supprimer ce RDV ?\')){ deleteRdv(\'' + id + '\'); closeModal(); }">🗑️ Supprimer</button>' : ''}</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-secondary" onclick="closeModal()">Annuler</button>
+        <button class="btn btn-primary" onclick="saveRdv('${id||''}')">💾 Enregistrer</button>
+      </div>
     </div>
   `);
 }
@@ -3562,8 +3604,14 @@ function onRdvClientChange() {
 }
 
 function saveRdv(id) {
-  let client = document.getElementById('m-r-client').value;
+  let client = document.getElementById('m-r-client') ? document.getElementById('m-r-client').value : '';
   const date = document.getElementById('m-r-date').value;
+  const existingRdv = id ? DB.rdv.find(x=>x.id===id) : null;
+
+  // En mode édition, si le client n'a pas été changé (select caché), garder l'ancien
+  if(id && existingRdv && !client) {
+    client = existingRdv.client;
+  }
 
   // Création nouveau client si sélectionné
   if(client === '__nouveau__') {
@@ -3588,10 +3636,34 @@ function saveRdv(id) {
   }
 
   if(!client||!date) return alert('Client et date obligatoires');
-  const data = { client, date, heure:document.getElementById('m-r-heure').value, duree:Number(document.getElementById('m-r-duree').value), type:document.getElementById('m-r-type').value, adresse:document.getElementById('m-r-adresse').value, tarif:Number(document.getElementById('m-r-tarif').value)||0, statut:'planifie' };
-  if(id) { const i=DB.rdv.findIndex(r=>r.id===id); if(i>=0) { data.statut=DB.rdv[i].statut; Object.assign(DB.rdv[i],data); saveItem('rdv', DB.rdv[i]); } }
-  else { const nr = {id:uid(), ...data}; DB.rdv.push(nr); saveItem('rdv', nr); }
+
+  // Statut depuis le toggle ou existant
+  const statutEl = document.getElementById('m-r-statut');
+  const statut = statutEl ? statutEl.value : (existingRdv ? existingRdv.statut : 'planifie');
+
+  const data = { 
+    client, date, 
+    heure: document.getElementById('m-r-heure').value, 
+    duree: Number(document.getElementById('m-r-duree').value), 
+    type: document.getElementById('m-r-type').value, 
+    adresse: document.getElementById('m-r-adresse').value, 
+    tarif: Number(document.getElementById('m-r-tarif').value)||0, 
+    statut: statut 
+  };
+
+  if(id) { 
+    const i = DB.rdv.findIndex(r=>r.id===id); 
+    if(i>=0) { 
+      Object.assign(DB.rdv[i], data); 
+      saveItem('rdv', DB.rdv[i]); 
+    } 
+  } else { 
+    const nr = {id:uid(), ...data}; 
+    DB.rdv.push(nr); 
+    saveItem('rdv', nr); 
+  }
   closeModal(); renderRdv(); renderClients(); renderAgenda();
+  showNotification('✅ RDV ' + (id ? 'modifié' : 'créé'), 'success');
 }
 
 function toggleRdvStatus(id) {
@@ -3867,24 +3939,30 @@ function showAgendaDay(dateStr) {
   } else {
     content.innerHTML = allEvents.map(ev => {
       const loc = ev.location ? '<div style="font-size:12px;color:var(--text-light);margin-top:4px">📍 ' + ev.location + '</div>' : '';
-      const actions = ev.rdvId ? '<div style="display:flex;gap:4px;margin-left:auto"><button class="icon-btn" onclick="openRdvModal(\'' + ev.rdvId + '\')" title="Modifier">✏️</button></div>' : '';
       const timeInfo = ev.allDay ? '<div style="font-size:13px;font-weight:600;color:' + ev.color + '">Journée</div>' :
         '<div style="font-size:16px;font-weight:700;color:' + ev.color + '">' + (ev.heure || '') + '</div>' + (ev.duree ? '<div style="font-size:11px;color:var(--text-light)">' + ev.duree + ' min</div>' : '');
       const badge = ev.type ? '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;color:#fff;background:' + ev.color + ';margin-right:6px">' + ev.type + '</span>' : '';
       const statutBadge = ev.statut ? '<span class="badge ' + (ev.statut === 'termine' ? 'badge-paid' : 'badge-accent') + '">' + (ev.statut === 'termine' ? '✓ Terminé' : '📅 Planifié') + '</span>' : '';
       const tarifStr = ev.tarif ? '<div style="font-weight:700;margin-left:12px">' + euro(ev.tarif) + '</div>' : '';
 
-      return '<div style="display:flex;align-items:center;gap:14px;padding:12px;background:var(--bg);border-radius:8px;margin-bottom:8px;border-left:4px solid ' + ev.color + '">' +
+      const clickable = ev.rdvId ? 'cursor:pointer;' : '';
+      const clickAction = ev.rdvId ? ' onclick="openRdvModal(\'' + ev.rdvId + '\')"' : '';
+
+      return '<div style="display:flex;align-items:center;gap:14px;padding:12px;background:var(--bg);border-radius:8px;margin-bottom:8px;border-left:4px solid ' + ev.color + ';' + clickable + 'transition:all 0.15s"' + clickAction + ' onmouseover="this.style.background=\'var(--border)\'" onmouseout="this.style.background=\'var(--bg)\'">' +
         '<div style="text-align:center;min-width:55px">' + timeInfo + '</div>' +
         '<div style="flex:1"><div style="font-weight:600;font-size:14px">' + ev.title + '</div>' +
         (badge || statutBadge ? '<div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap">' + badge + statutBadge + '</div>' : '') +
         loc + '</div>' +
-        tarifStr + actions +
+        tarifStr +
       '</div>';
     }).join('');
   }
 
+  // Bouton ajouter un RDV
+  content.innerHTML += '<div style="text-align:center;padding:12px"><button class="btn btn-primary btn-sm" onclick="openRdvModal(null,\'' + dateStr + '\')">＋ Nouveau RDV pour ce jour</button></div>';
+
   detail.style.display = 'block';
+  detail.scrollIntoView({behavior:'smooth', block:'nearest'});
 }
 
 
