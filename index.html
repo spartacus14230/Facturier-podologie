@@ -4731,13 +4731,13 @@ async function fullSyncGoogleCalendar() {
     return;
   }
 
-  showGcalStatus('⏳ Synchronisation en cours...', 'loading');
+  showGcalStatus('⏳ Récupération des événements Google...', 'loading');
 
   try {
-    // Période: 6 mois avant → 6 mois après
+    // Période: 3 mois avant → 3 mois après
     const now = new Date();
-    const timeMin = new Date(now.getFullYear(), now.getMonth() - 6, 1);
-    const timeMax = new Date(now.getFullYear(), now.getMonth() + 7, 0);
+    const timeMin = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+    const timeMax = new Date(now.getFullYear(), now.getMonth() + 4, 0);
 
     // 1) Récupérer les événements Google
     const googleEvents = await getGoogleEvents(timeMin, timeMax);
@@ -4745,30 +4745,30 @@ async function fullSyncGoogleCalendar() {
 
     let imported = 0, updated = 0, pushed = 0, skipped = 0;
 
-    // 2) GOOGLE → APP : Importer/Mettre à jour les événements Google dans les RDV
+    // 2) GOOGLE → APP : Importer/Mettre à jour
+    showGcalStatus('⏳ Import depuis Google... (' + googleEvents.length + ' événements)', 'loading');
+    
+    // Index rapide pour les lookups
+    const rdvByFwpId = new Map(DB.rdv.map(r => [r.id, r]));
+    const rdvByGoogleId = new Map(DB.rdv.filter(r => r.googleEventId).map(r => [r.googleEventId, r]));
+
     for(const event of googleEvents) {
       if(event.status === 'cancelled') continue;
 
       const fwpId = extractFwpId(event.description);
 
       if(fwpId) {
-        // Événement créé par l'appli → vérifier si RDV existe encore
-        const existingRdv = DB.rdv.find(r => r.id === fwpId);
-        if(existingRdv) {
-          // Mettre à jour googleEventId pour le lien
-          if(!existingRdv.googleEventId) {
-            existingRdv.googleEventId = event.id;
-            saveItem('rdv', existingRdv);
-          }
-          skipped++;
+        const existingRdv = rdvByFwpId.get(fwpId);
+        if(existingRdv && !existingRdv.googleEventId) {
+          existingRdv.googleEventId = event.id;
+          saveItem('rdv', existingRdv);
         }
-        continue; // Pas besoin d'importer, c'est un événement de l'appli
+        skipped++;
+        continue;
       }
 
-      // Événement créé sur Google (téléphone) → importer comme nouveau RDV
-      const existingByGoogleId = DB.rdv.find(r => r.googleEventId === event.id);
+      const existingByGoogleId = rdvByGoogleId.get(event.id);
       if(existingByGoogleId) {
-        // Déjà importé → mettre à jour si modifié
         const parsed = parseGoogleEventToRdv(event);
         let changed = false;
         if(parsed.date !== existingByGoogleId.date) { existingByGoogleId.date = parsed.date; changed = true; }
@@ -4789,9 +4789,8 @@ async function fullSyncGoogleCalendar() {
 
       // Nouveau: importer
       const rdvData = parseGoogleEventToRdv(event);
-      if(!rdvData.date) continue; // Skip all-day events without valid date
+      if(!rdvData.date) continue;
       
-      // Matcher le client
       const knownClient = DB.clients.find(c => {
         const cNorm = c.nom.toLowerCase();
         const rNorm = rdvData.client.toLowerCase();
@@ -4805,39 +4804,56 @@ async function fullSyncGoogleCalendar() {
       imported++;
     }
 
-    // 3) APP → GOOGLE : Pousser les RDV qui n'ont pas de googleEventId
+    // 3) APP → GOOGLE : Pousser les RDV — seulement ceux qui en ont besoin
+    const googleEventIds = new Set(googleEvents.map(e => e.id));
     const rdvInRange = DB.rdv.filter(r => {
       const d = new Date(r.date);
       return d >= timeMin && d <= timeMax;
     });
 
+    // Séparer : à créer vs à mettre à jour (seulement si pas trouvé sur Google = supprimé)
+    const toCreate = [];
+    const toUpdate = [];
+    
     for(const rdv of rdvInRange) {
-      if(rdv.googleEventId) {
-        // Déjà sur Google → mettre à jour
-        try {
-          await updateGoogleEvent(rdv.googleEventId, rdv);
-        } catch(e) {
-          // Si l'événement n'existe plus sur Google, le recréer
-          if(e.message.includes('404') || e.message.includes('Not Found')) {
-            const created = await createGoogleEvent(rdv);
-            rdv.googleEventId = created.id;
-            saveItem('rdv', rdv);
-            pushed++;
-          }
-        }
-        continue;
+      if(!rdv.googleEventId) {
+        toCreate.push(rdv);
+      } else if(!googleEventIds.has(rdv.googleEventId)) {
+        // L'événement n'existe plus sur Google → recréer
+        rdv.googleEventId = null;
+        toCreate.push(rdv);
       }
+      // Si googleEventId existe ET est dans googleEvents → déjà synchro, on ne touche pas
+    }
 
-      // Pas encore sur Google → créer
+    const totalPush = toCreate.length + toUpdate.length;
+    if(totalPush > 0) {
+      showGcalStatus('⏳ Envoi vers Google... 0/' + totalPush, 'loading');
+    }
+
+    // Traitement par lots de 5 en parallèle
+    let done = 0;
+    const processBatch = async (items, handler) => {
+      for(let i = 0; i < items.length; i += 5) {
+        const batch = items.slice(i, i + 5);
+        await Promise.allSettled(batch.map(handler));
+        done += batch.length;
+        if(totalPush > 0) {
+          showGcalStatus('⏳ Envoi vers Google... ' + done + '/' + totalPush, 'loading');
+        }
+      }
+    };
+
+    await processBatch(toCreate, async (rdv) => {
       try {
         const created = await createGoogleEvent(rdv);
         rdv.googleEventId = created.id;
         saveItem('rdv', rdv);
         pushed++;
       } catch(e) {
-        console.error('Erreur push RDV vers Google:', rdv.id, e);
+        console.error('Erreur push RDV:', rdv.id, e);
       }
-    }
+    });
 
     // 4) Stocker TOUS les événements Google pour l'affichage calendrier
     DB.gcalEvents = googleEvents.filter(e => e.status !== 'cancelled').map(e => {
@@ -4851,7 +4867,6 @@ async function fullSyncGoogleCalendar() {
       } else if(e.start?.date) {
         date = e.start.date;
         endDate = e.end?.date || date;
-        // Google end date for all-day is exclusive, so subtract 1 day
         if(endDate > date) {
           const ed = new Date(endDate);
           ed.setDate(ed.getDate() - 1);
@@ -4884,7 +4899,6 @@ async function fullSyncGoogleCalendar() {
     showGcalStatus('✅ Synchronisation terminée ! ' + msg.join(' • '), 'success');
     console.log('✓ Sync Google Calendar:', msg.join(', '));
 
-    // Sauver la dernière date de sync
     DB.settings.lastGcalSync = new Date().toISOString();
 
   } catch(err) {
