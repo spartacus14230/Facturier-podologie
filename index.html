@@ -3575,7 +3575,23 @@ function openRdvModal(id, prefillDate) {
       </select></div>
     </div>
     <div class="form-group"><label class="form-label">Adresse du RDV</label><input id="m-r-adresse" value="${r?r.adresse:''}"></div>
-    <div class="form-group"><label class="form-label">Tarif (€)</label><input type="number" step="0.01" id="m-r-tarif" value="${r?r.tarif:''}"></div>
+    <div class="form-row">
+      <div class="form-group"><label class="form-label">Tarif (€)</label><input type="number" step="0.01" id="m-r-tarif" value="${r?r.tarif:''}"></div>
+      <div class="form-group"><label class="form-label" style="display:flex;align-items:center;gap:8px">
+        <input type="checkbox" id="m-r-prive" ${r&&r.prive?'checked':''} style="width:16px;height:16px;accent-color:var(--accent)"> Privé 🔒
+      </label></div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Couleur</label>
+      <div id="m-r-color-picker" style="display:flex;gap:6px;flex-wrap:wrap">
+        ${Object.entries(GCAL_COLORS).map(([cid, hex]) => {
+          const sel = r && r.colorId === cid;
+          const names = {'0':'Défaut','1':'Lavande','2':'Sauge','3':'Raisin','4':'Flamant','5':'Banane','6':'Mandarine','7':'Paon','8':'Graphite','9':'Myrtille','10':'Basilic','11':'Tomate'};
+          return '<div onclick="document.querySelectorAll(\'#m-r-color-picker div\').forEach(d=>d.style.outline=\'none\');this.style.outline=\'3px solid var(--text)\';document.getElementById(\'m-r-color\').value=\'' + cid + '\'" title="' + (names[cid]||'') + '" style="width:28px;height:28px;border-radius:50%;background:' + hex + ';cursor:pointer;' + (sel ? 'outline:3px solid var(--text);' : '') + 'transition:transform 0.1s" onmouseover="this.style.transform=\'scale(1.2)\'" onmouseout="this.style.transform=\'scale(1)\'"></div>';
+        }).join('')}
+      </div>
+      <input type="hidden" id="m-r-color" value="${r&&r.colorId?r.colorId:'0'}">
+    </div>
     <div class="modal-actions" style="display:flex;gap:8px;justify-content:space-between;align-items:center">
       <div>${isEdit ? '<button class="btn btn-sm" style="background:#fef2f2;color:var(--danger);border:1px solid var(--danger)" onclick="if(confirm(\'Supprimer ce RDV ?\')){ deleteRdv(\'' + id + '\'); closeModal(); }">🗑️ Supprimer</button>' : ''}</div>
       <div style="display:flex;gap:8px">
@@ -3648,7 +3664,9 @@ function saveRdv(id) {
     type: document.getElementById('m-r-type').value, 
     adresse: document.getElementById('m-r-adresse').value, 
     tarif: Number(document.getElementById('m-r-tarif').value)||0, 
-    statut: statut 
+    statut: statut,
+    colorId: document.getElementById('m-r-color').value || '0',
+    prive: document.getElementById('m-r-prive').checked
   };
 
   if(id) { 
@@ -3829,10 +3847,11 @@ function renderAgenda() {
           dayEvents.push({
             title: (r.heure ? '' : '') + r.client,
             heure: r.heure || '',
-            color: r.statut === 'termine' ? '#33B679' : '#4285F4',
+            color: r.colorId ? (GCAL_COLORS[r.colorId] || '#4285F4') : (r.statut === 'termine' ? '#33B679' : '#4285F4'),
             allDay: false,
             isMultiDay: false,
-            source: 'local'
+            source: 'local',
+            prive: r.prive
           });
         }
       });
@@ -3862,7 +3881,7 @@ function renderAgenda() {
           html += '<div style="background:' + ev.color + ';color:#fff;font-size:10px;padding:1px 4px;margin:1px 0;border-radius:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.5">' + ev.title + '</div>';
         } else {
           // Timed: colored left border chip
-          html += '<div style="background:' + ev.color + '22;border-left:3px solid ' + ev.color + ';font-size:10px;padding:1px 4px;margin:1px 0;border-radius:0 3px 3px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.5;color:' + ev.color + ';font-weight:500">' + (ev.heure ? ev.heure + ' ' : '') + ev.title + '</div>';
+          html += '<div style="background:' + ev.color + '22;border-left:3px solid ' + ev.color + ';font-size:10px;padding:1px 4px;margin:1px 0;border-radius:0 3px 3px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.5;color:' + ev.color + ';font-weight:500">' + (ev.prive ? '🔒 ' : '') + (ev.heure ? ev.heure + ' ' : '') + ev.title + '</div>';
         }
       });
 
@@ -3911,7 +3930,7 @@ function showAgendaDay(dateStr) {
       allEvents.push({
         title: r.client,
         heure: r.heure,
-        color: r.statut === 'termine' ? '#33B679' : '#4285F4',
+        color: r.colorId ? (GCAL_COLORS[r.colorId] || '#4285F4') : (r.statut === 'termine' ? '#33B679' : '#4285F4'),
         allDay: false,
         location: r.adresse,
         source: 'local',
@@ -3919,7 +3938,8 @@ function showAgendaDay(dateStr) {
         type: r.type,
         duree: r.duree,
         tarif: r.tarif,
-        statut: r.statut
+        statut: r.statut,
+        prive: r.prive
       });
     }
   });
@@ -3948,10 +3968,12 @@ function showAgendaDay(dateStr) {
       const clickable = ev.rdvId ? 'cursor:pointer;' : '';
       const clickAction = ev.rdvId ? ' onclick="openRdvModal(\'' + ev.rdvId + '\')"' : '';
 
+      const priveBadge = ev.prive ? '<span style="display:inline-block;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;color:#616161;background:#f0f0f0;margin-right:6px">🔒 Privé</span>' : '';
+
       return '<div style="display:flex;align-items:center;gap:14px;padding:12px;background:var(--bg);border-radius:8px;margin-bottom:8px;border-left:4px solid ' + ev.color + ';' + clickable + 'transition:all 0.15s"' + clickAction + ' onmouseover="this.style.background=\'var(--border)\'" onmouseout="this.style.background=\'var(--bg)\'">' +
         '<div style="text-align:center;min-width:55px">' + timeInfo + '</div>' +
-        '<div style="flex:1"><div style="font-weight:600;font-size:14px">' + ev.title + '</div>' +
-        (badge || statutBadge ? '<div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap">' + badge + statutBadge + '</div>' : '') +
+        '<div style="flex:1"><div style="font-weight:600;font-size:14px">' + (ev.prive ? '🔒 ' : '') + ev.title + '</div>' +
+        (badge || statutBadge || priveBadge ? '<div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap">' + badge + priveBadge + statutBadge + '</div>' : '') +
         loc + '</div>' +
         tarifStr +
       '</div>';
@@ -4514,7 +4536,8 @@ async function createGoogleEvent(rdv) {
       '\n[FWP-ID:' + rdv.id + ']',
     start: { dateTime: startDT, timeZone: 'Europe/Paris' },
     end: { dateTime: endDT, timeZone: 'Europe/Paris' },
-    colorId: rdv.statut === 'termine' ? '2' : '9' // vert si terminé, bleu sinon
+    colorId: rdv.colorId || (rdv.statut === 'termine' ? '2' : '9'), // couleur perso ou defaut
+    visibility: rdv.prive ? 'private' : 'default'
   };
 
   return gcalFetch(
