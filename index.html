@@ -1648,7 +1648,20 @@ function renderClients() {
 
   tbody.innerHTML = filtered.map(c => {
     const chevaux = DB.chevaux.filter(ch=>ch.proprietaire===c.nom);
-    const chevauxHTML = chevaux.length>0 ? chevaux.map(h=>`<span class="badge badge-accent">🐴 ${h.nom}</span>`).join(' ') : '-';
+    let chevauxHTML = '-';
+    if(chevaux.length === 1) {
+      chevauxHTML = `<span class="badge badge-accent">🐴 ${chevaux[0].nom}${chevaux[0].type?' ('+chevaux[0].type+')':''}</span>`;
+    } else if(chevaux.length > 1) {
+      const listId = 'ch-list-' + c.id;
+      chevauxHTML = `<div style="position:relative;display:inline-block">
+        <button class="badge badge-accent" onclick="event.stopPropagation();const el=document.getElementById('${listId}');el.style.display=el.style.display==='block'?'none':'block'" style="cursor:pointer;border:none">🐴 ${chevaux.length} chevaux ▾</button>
+        <div id="${listId}" style="display:none;position:absolute;top:100%;left:0;z-index:50;background:var(--card);border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);min-width:180px;padding:4px 0;margin-top:4px">
+          ${chevaux.map(h => `<div style="padding:6px 12px;font-size:13px;display:flex;align-items:center;gap:8px;cursor:pointer;border-bottom:1px solid var(--border)" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background=''" onclick="event.stopPropagation();openChevalFiche('${h.id}')">
+            <span>🐴</span><span style="font-weight:600">${h.nom}</span>${h.type?'<span style="font-size:11px;color:var(--text-light)">'+h.type+'</span>':''}
+          </div>`).join('')}
+        </div>
+      </div>`;
+    }
     const addr = c.adresse ? encodeURIComponent(c.adresse) : '';
     return `<tr>
       <td><div style="display:flex;align-items:center;gap:10px"><div class="initial" style="background:${initialColor(getInitial(c.nom))}">${getInitial(c.nom)}</div><span style="font-weight:600">${c.nom}</span></div></td>
@@ -4931,6 +4944,11 @@ function handleLogout() {
 async function initApp() {
   // Charger les données depuis Firebase
   await loadDB();
+
+  // Fermer les dropdowns chevaux quand on clique ailleurs
+  document.addEventListener('click', () => {
+    document.querySelectorAll('[id^="ch-list-"]').forEach(el => el.style.display = 'none');
+  });
 
   // Initialiser Google Calendar si Client ID configuré
   if(DB.settings.gcalClientId) {
