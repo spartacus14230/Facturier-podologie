@@ -575,7 +575,14 @@ body.dark .login-input { background:#111827; color:#f3f4f6; border-color:#374151
       <h2 id="agenda-month-title" style="font-size:20px;font-weight:700"></h2>
       <button class="btn btn-secondary" onclick="changeAgendaMonth(1)">Mois suivant ▶</button>
     </div>
-    <div id="agenda-calendar" style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px"></div>
+    <div id="agenda-calendar" style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px"></div>
+    <div style="display:flex;gap:16px;margin-top:12px;flex-wrap:wrap;font-size:11px;color:var(--text-light)">
+      <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#4285F4;margin-right:4px"></span>Consultation</span>
+      <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#0B8043;margin-right:4px"></span>Parage</span>
+      <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#D50000;margin-right:4px"></span>Urgence</span>
+      <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#F4511E;margin-right:4px"></span>Suivi</span>
+      <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#8E24AA;margin-right:4px"></span>Déferrage</span>
+    </div>
   </div>
   <div id="agenda-day-detail" class="card" style="display:none;margin-top:16px">
     <h3 id="agenda-day-title" style="font-size:16px;font-weight:700;margin-bottom:12px"></h3>
@@ -2486,39 +2493,55 @@ async function sendFactureByEmail(id) {
     // 2. Extraire le base64 pur (sans préfixe data:...)
     const pdfBase64 = pdfData.base64.split(',')[1];
 
-    // 3. Construire le mail MIME avec pièce jointe
-    const companyName = s.nomEntreprise || 'Fw Podologue équin';
+    // 3. Construire le mail MIME avec piece jointe
+    const companyName = (s.nomEntreprise || 'Fw Podologue equin').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     const fromEmail = s.email || '';
-    const boundary = 'boundary_' + Date.now();
+    const boundary = 'fw_boundary_' + Date.now();
+    const clientNom = (client.nom || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
-    const emailBody = `Bonjour ${client.nom},\r\n\r\nVeuillez trouver ci-joint la facture ${f.numero} d'un montant de ${(Number(f.montant)||0).toFixed(2).replace('.',',')} €.\r\n\r\nDate d'échéance : ${echStr}\r\n\r\nMerci de bien vouloir procéder au règlement sous 7 jours.\r\n\r\nCordialement,\r\n${companyName}\r\n${s.telephone||''}\r\n${fromEmail}`;
+    // Corps du mail en texte simple (sans accents pour compatibilite)
+    const bodyLines = [
+      'Bonjour ' + clientNom + ',',
+      '',
+      'Veuillez trouver ci-joint la facture ' + f.numero + ' d\'un montant de ' + (Number(f.montant)||0).toFixed(2).replace('.',',') + ' EUR.',
+      '',
+      'Date d\'echeance : ' + echStr,
+      '',
+      'Merci de bien vouloir proceder au reglement sous 7 jours.',
+      '',
+      'Cordialement,',
+      companyName,
+      s.telephone || '',
+      fromEmail
+    ].join('\r\n');
 
-    const mimeLines = [
-      'MIME-Version: 1.0',
-      `From: ${companyName} <${fromEmail}>`,
-      `To: ${client.email}`,
-      fromEmail ? `Bcc: ${fromEmail}` : '',
-      `Subject: =?UTF-8?B?${btoa(unescape(encodeURIComponent(`Facture ${f.numero} — ${companyName}`)))}?=`,
-      `Content-Type: multipart/mixed; boundary="${boundary}"`,
-      '',
-      `--${boundary}`,
-      'Content-Type: text/plain; charset=UTF-8',
-      'Content-Transfer-Encoding: base64',
-      '',
-      btoa(unescape(encodeURIComponent(emailBody))),
-      '',
-      `--${boundary}`,
-      `Content-Type: application/pdf; name="${pdfData.fileName}"`,
-      'Content-Transfer-Encoding: base64',
-      `Content-Disposition: attachment; filename="${pdfData.fileName}"`,
-      '',
-      pdfBase64,
-      '',
-      `--${boundary}--`
-    ].filter(l => l !== false && l !== '').join('\r\n');
+    const subjectLine = 'Facture ' + f.numero + ' - ' + companyName;
+
+    // Construction MIME multipart/mixed
+    const mime = 'From: ' + fromEmail + '\r\n' +
+      'To: ' + client.email + '\r\n' +
+      (fromEmail ? 'Bcc: ' + fromEmail + '\r\n' : '') +
+      'Subject: ' + subjectLine + '\r\n' +
+      'MIME-Version: 1.0\r\n' +
+      'Content-Type: multipart/mixed; boundary="' + boundary + '"\r\n' +
+      '\r\n' +
+      '--' + boundary + '\r\n' +
+      'Content-Type: text/plain; charset="UTF-8"\r\n' +
+      '\r\n' +
+      bodyLines + '\r\n' +
+      '\r\n' +
+      '--' + boundary + '\r\n' +
+      'Content-Type: application/pdf; name="' + pdfData.fileName + '"\r\n' +
+      'Content-Disposition: attachment; filename="' + pdfData.fileName + '"\r\n' +
+      'Content-Transfer-Encoding: base64\r\n' +
+      '\r\n' +
+      pdfBase64 + '\r\n' +
+      '\r\n' +
+      '--' + boundary + '--';
 
     // 4. Encoder en base64 URL-safe pour Gmail API
-    const rawMessage = btoa(unescape(encodeURIComponent(mimeLines)))
+    // On convertit chaque caractere en byte (ASCII safe car on a retire les accents)
+    const rawMessage = btoa(mime)
       .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
     // 5. Envoyer via Gmail API
@@ -3652,38 +3675,55 @@ function renderAgenda() {
   const startDow = (firstDay.getDay() + 6) % 7; // Lundi = 0
 
   const jours = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
-  let html = jours.map(j => `<div style="text-align:center;font-weight:700;font-size:12px;padding:8px;color:var(--text-light);background:var(--bg);border-radius:4px">${j}</div>`).join('');
+  let html = jours.map(j => `<div style="text-align:center;font-weight:700;font-size:13px;padding:10px;color:var(--text-light);background:var(--bg);border-radius:6px">${j}</div>`).join('');
 
   // Jours vides avant le 1er
   for (let i = 0; i < startDow; i++) {
-    html += '<div></div>';
+    html += '<div style="min-height:100px"></div>';
   }
 
   const todayStr = new Date().toISOString().split('T')[0];
 
+  // Couleurs par type de RDV (style Google Calendar)
+  const typeColors = {
+    'Consultation': '#4285F4',
+    'Parage': '#0B8043',
+    'Urgence': '#D50000',
+    'Suivi': '#F4511E',
+    'Déferrage': '#8E24AA'
+  };
+
   // Jours du mois
   for (let d = 1; d <= lastDay.getDate(); d++) {
     const dateStr = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
-    const dayRdvs = DB.rdv.filter(r => r.date === dateStr);
+    const dayRdvs = DB.rdv.filter(r => r.date === dateStr).sort((a,b) => (a.heure||'').localeCompare(b.heure||''));
     const isToday = dateStr === todayStr;
     const hasRdv = dayRdvs.length > 0;
 
-    let style = 'text-align:center;padding:8px 4px;border-radius:8px;cursor:pointer;min-height:50px;border:1px solid var(--border);font-size:14px;transition:all 0.2s;';
-    if (isToday) style += 'background:var(--accent);color:#fff;font-weight:700;';
-    else if (hasRdv) style += 'background:var(--success-bg);border-color:var(--success);';
+    let style = 'padding:6px 8px;border-radius:8px;cursor:pointer;min-height:100px;border:1px solid var(--border);font-size:14px;transition:all 0.2s;vertical-align:top;';
+    if (isToday) style += 'background:var(--card);border:2px solid var(--accent);';
     else style += 'background:var(--card);';
 
-    let content = '<div style="font-weight:600">' + d + '</div>';
+    // Numéro du jour
+    let content = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">';
+    if (isToday) {
+      content += '<div style="width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px">' + d + '</div>';
+    } else {
+      content += '<div style="font-weight:600;font-size:13px;color:var(--text);padding:2px 4px">' + d + '</div>';
+    }
+    if (hasRdv) content += '<span style="font-size:10px;color:var(--text-light)">' + dayRdvs.length + ' rdv</span>';
+    content += '</div>';
+
+    // Événements
     if (hasRdv) {
-      content += '<div style="font-size:10px;margin-top:2px">';
-      dayRdvs.slice(0, 2).forEach(r => {
-        content += '<div style="background:' + (isToday ? 'rgba(255,255,255,0.3)' : 'var(--success)') + ';color:' + (isToday ? '#fff' : '#fff') + ';border-radius:3px;padding:1px 3px;margin:1px 0;font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + r.heure + ' ' + r.client + '</div>';
+      dayRdvs.slice(0, 3).forEach(r => {
+        const color = typeColors[r.type] || 'var(--accent)';
+        content += '<div style="background:' + color + ';color:#fff;border-radius:4px;padding:2px 6px;margin:2px 0;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.4">' + (r.heure||'') + ' ' + (r.client||'') + '</div>';
       });
-      if (dayRdvs.length > 2) content += '<div style="font-size:9px;color:var(--text-light)">+' + (dayRdvs.length - 2) + ' autre(s)</div>';
-      content += '</div>';
+      if (dayRdvs.length > 3) content += '<div style="font-size:10px;color:var(--text-light);padding:2px 4px">+' + (dayRdvs.length - 3) + ' autre(s)</div>';
     }
 
-    html += '<div style="' + style + '" onclick="showAgendaDay(\'' + dateStr + '\')" onmouseover="if(!this.style.background.includes(\'var(--accent)\'))this.style.transform=\'scale(1.05)\'" onmouseout="this.style.transform=\'scale(1)\'">' + content + '</div>';
+    html += '<div style="' + style + '" onclick="showAgendaDay(\'' + dateStr + '\')" onmouseover="this.style.boxShadow=\'0 2px 8px rgba(0,0,0,0.1)\'" onmouseout="this.style.boxShadow=\'none\'">' + content + '</div>';
   }
 
   document.getElementById('agenda-calendar').innerHTML = html;
@@ -3691,12 +3731,14 @@ function renderAgenda() {
 }
 
 function showAgendaDay(dateStr) {
-  const dayRdvs = DB.rdv.filter(r => r.date === dateStr);
+  const dayRdvs = DB.rdv.filter(r => r.date === dateStr).sort((a,b) => (a.heure||'').localeCompare(b.heure||''));
   const dt = new Date(dateStr);
   const jours = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
   const mois = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
 
   document.getElementById('agenda-day-title').textContent = jours[dt.getDay()] + ' ' + dt.getDate() + ' ' + mois[dt.getMonth()] + ' ' + dt.getFullYear();
+
+  const typeColors = {'Consultation':'#4285F4','Parage':'#0B8043','Urgence':'#D50000','Suivi':'#F4511E','Déferrage':'#8E24AA'};
 
   const detail = document.getElementById('agenda-day-detail');
   const content = document.getElementById('agenda-day-content');
@@ -3705,10 +3747,11 @@ function showAgendaDay(dateStr) {
     content.innerHTML = '<p style="color:var(--text-light);text-align:center;padding:24px">Aucun rendez-vous ce jour</p>';
   } else {
     content.innerHTML = dayRdvs.map(r => {
+      const color = typeColors[r.type] || 'var(--accent)';
       const addr = r.adresse ? '<div style="font-size:12px;color:var(--text-light);margin-top:4px">📍 ' + r.adresse + '</div>' : '';
-      return '<div style="display:flex;align-items:center;gap:16px;padding:12px;background:var(--bg);border-radius:8px;margin-bottom:8px;border-left:4px solid ' + (r.statut === 'termine' ? 'var(--success)' : 'var(--accent)') + '">' +
-        '<div style="text-align:center;min-width:60px"><div style="font-size:18px;font-weight:700;color:var(--accent)">' + r.heure + '</div><div style="font-size:11px;color:var(--text-light)">' + r.duree + ' min</div></div>' +
-        '<div style="flex:1"><div style="font-weight:600">' + r.client + '</div><div style="display:flex;gap:6px;margin-top:4px"><span class="badge badge-info">' + r.type + '</span><span class="badge ' + (r.statut === 'termine' ? 'badge-paid' : 'badge-accent') + '">' + (r.statut === 'termine' ? '✓ Terminé' : '📅 Planifié') + '</span></div>' + addr + '</div>' +
+      return '<div style="display:flex;align-items:center;gap:16px;padding:12px;background:var(--bg);border-radius:8px;margin-bottom:8px;border-left:4px solid ' + color + '">' +
+        '<div style="text-align:center;min-width:60px"><div style="font-size:18px;font-weight:700;color:' + color + '">' + r.heure + '</div><div style="font-size:11px;color:var(--text-light)">' + r.duree + ' min</div></div>' +
+        '<div style="flex:1"><div style="font-weight:600">' + r.client + '</div><div style="display:flex;gap:6px;margin-top:4px"><span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;color:#fff;background:' + color + '">' + r.type + '</span><span class="badge ' + (r.statut === 'termine' ? 'badge-paid' : 'badge-accent') + '">' + (r.statut === 'termine' ? '✓ Terminé' : '📅 Planifié') + '</span></div>' + addr + '</div>' +
         '<div style="font-weight:700">' + (r.tarif ? euro(r.tarif) : '') + '</div>' +
         '<div style="display:flex;gap:4px"><button class="icon-btn" onclick="addToGoogleCalendar(\'' + r.id + '\')" title="Google Agenda" style="font-size:14px">📅</button><button class="icon-btn" onclick="openRdvModal(\'' + r.id + '\')" title="Modifier">✏️</button></div>' +
       '</div>';
