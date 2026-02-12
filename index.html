@@ -561,7 +561,7 @@ body.dark .login-input { background:#111827; color:#f3f4f6; border-color:#374151
      ══════════════════════════════════════════════════════════════ -->
 <div class="page" id="page-agenda">
   <div class="page-header">
-    <div><h1 class="page-title">Agenda</h1><p class="page-subtitle">Vue calendrier — synchronisé avec les RDV et Google Agenda</p></div>
+    <div><h1 class="page-title">Agenda</h1><p class="page-subtitle">Synchronisé avec Google Agenda</p></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button id="btn-gcal-connect" class="btn btn-secondary" onclick="connectGoogleCalendar()" style="white-space:nowrap">🔗 Connecter Google Agenda</button>
       <button id="btn-gcal-sync" class="btn btn-primary" onclick="fullSyncGoogleCalendar()" style="display:none;white-space:nowrap">🔄 Synchroniser</button>
@@ -569,20 +569,13 @@ body.dark .login-input { background:#111827; color:#f3f4f6; border-color:#374151
     </div>
   </div>
   <div id="gcal-status" style="display:none;padding:12px;border-radius:8px;margin-bottom:16px;font-size:13px"></div>
-  <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-      <button class="btn btn-secondary" onclick="changeAgendaMonth(-1)">◀ Mois précédent</button>
-      <h2 id="agenda-month-title" style="font-size:20px;font-weight:700"></h2>
-      <button class="btn btn-secondary" onclick="changeAgendaMonth(1)">Mois suivant ▶</button>
+  <div class="card" style="padding:0;overflow:hidden">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border)">
+      <button class="btn btn-secondary btn-sm" onclick="changeAgendaMonth(-1)">◀</button>
+      <h2 id="agenda-month-title" style="font-size:20px;font-weight:700;margin:0"></h2>
+      <button class="btn btn-secondary btn-sm" onclick="changeAgendaMonth(1)">▶</button>
     </div>
-    <div id="agenda-calendar" style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px"></div>
-    <div style="display:flex;gap:16px;margin-top:12px;flex-wrap:wrap;font-size:11px;color:var(--text-light)">
-      <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#4285F4;margin-right:4px"></span>Consultation</span>
-      <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#0B8043;margin-right:4px"></span>Parage</span>
-      <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#D50000;margin-right:4px"></span>Urgence</span>
-      <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#F4511E;margin-right:4px"></span>Suivi</span>
-      <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#8E24AA;margin-right:4px"></span>Déferrage</span>
-    </div>
+    <div id="agenda-calendar"></div>
   </div>
   <div id="agenda-day-detail" class="card" style="display:none;margin-top:16px">
     <h3 id="agenda-day-title" style="font-size:16px;font-weight:700;margin-bottom:12px"></h3>
@@ -1215,6 +1208,7 @@ let DB = {
   rdv: [
     { id:"r1", client:"fab", date:"2026-02-04", heure:"14:00", duree:60, type:"Consultation", adresse:"6 route d'ecrammeville 14230 longueville", tarif:800, statut:"termine" },
   ],
+  gcalEvents: [],
   settings: {
     nomEntreprise: "Fw Podologue équin",
     siret: "827 695 016 000 36",
@@ -3664,6 +3658,30 @@ function changeAgendaMonth(delta) {
   renderAgenda();
 }
 
+// Google Calendar color mapping (colorId → hex)
+const GCAL_COLORS = {
+  '0': '#4285F4', // Default blue
+  '1': '#7986CB', // Lavender
+  '2': '#33B679', // Sage
+  '3': '#8E24AA', // Grape
+  '4': '#E67C73', // Flamingo
+  '5': '#F6BF26', // Banana
+  '6': '#F4511E', // Tangerine
+  '7': '#039BE5', // Peacock
+  '8': '#616161', // Graphite
+  '9': '#3F51B5', // Blueberry
+  '10': '#0B8043', // Basil
+  '11': '#D50000'  // Tomato
+};
+
+function getWeekNumber(d) {
+  const date = new Date(d.getTime());
+  date.setHours(0,0,0,0);
+  date.setDate(date.getDate() + 3 - (date.getDay() + 6) % 7);
+  const week1 = new Date(date.getFullYear(), 0, 4);
+  return 1 + Math.round(((date - week1) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
+}
+
 function renderAgenda() {
   const year = agendaDate.getFullYear();
   const month = agendaDate.getMonth();
@@ -3673,57 +3691,116 @@ function renderAgenda() {
   const firstDay = new Date(year, month, 1);
   const lastDay = new Date(year, month + 1, 0);
   const startDow = (firstDay.getDay() + 6) % 7; // Lundi = 0
-
-  const jours = ['Lun','Mar','Mer','Jeu','Ven','Sam','Dim'];
-  let html = jours.map(j => `<div style="text-align:center;font-weight:700;font-size:13px;padding:10px;color:var(--text-light);background:var(--bg);border-radius:6px">${j}</div>`).join('');
-
-  // Jours vides avant le 1er
-  for (let i = 0; i < startDow; i++) {
-    html += '<div style="min-height:100px"></div>';
-  }
-
   const todayStr = new Date().toISOString().split('T')[0];
 
-  // Couleurs par type de RDV (style Google Calendar)
-  const typeColors = {
-    'Consultation': '#4285F4',
-    'Parage': '#0B8043',
-    'Urgence': '#D50000',
-    'Suivi': '#F4511E',
-    'Déferrage': '#8E24AA'
-  };
+  // Build calendar grid: 8 columns (week# + 7 days)
+  let html = '<div style="display:grid;grid-template-columns:36px repeat(7,1fr);border-bottom:1px solid var(--border)">';
+  
+  // Header row
+  html += '<div style="padding:8px 4px;text-align:center;font-size:11px;color:var(--text-light);font-weight:600;border-right:1px solid var(--border)"></div>';
+  const jours = ['lun.','mar.','mer.','jeu.','ven.','sam.','dim.'];
+  jours.forEach((j,i) => {
+    html += '<div style="padding:8px 4px;text-align:center;font-size:12px;color:var(--text-light);font-weight:600;' + (i < 6 ? 'border-right:1px solid var(--border)' : '') + '">' + j + '</div>';
+  });
+  html += '</div>';
 
-  // Jours du mois
-  for (let d = 1; d <= lastDay.getDate(); d++) {
-    const dateStr = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
-    const dayRdvs = DB.rdv.filter(r => r.date === dateStr).sort((a,b) => (a.heure||'').localeCompare(b.heure||''));
-    const isToday = dateStr === todayStr;
-    const hasRdv = dayRdvs.length > 0;
+  // Build weeks
+  const totalCells = startDow + lastDay.getDate();
+  const totalRows = Math.ceil(totalCells / 7);
 
-    let style = 'padding:6px 8px;border-radius:8px;cursor:pointer;min-height:100px;border:1px solid var(--border);font-size:14px;transition:all 0.2s;vertical-align:top;';
-    if (isToday) style += 'background:var(--card);border:2px solid var(--accent);';
-    else style += 'background:var(--card);';
+  for(let row = 0; row < totalRows; row++) {
+    // Get the date of first day of this row for week number
+    const rowFirstDay = row * 7 - startDow + 1;
+    const rowDate = new Date(year, month, Math.max(rowFirstDay, 1));
+    const weekNum = getWeekNumber(rowDate);
 
-    // Numéro du jour
-    let content = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">';
-    if (isToday) {
-      content += '<div style="width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px">' + d + '</div>';
-    } else {
-      content += '<div style="font-weight:600;font-size:13px;color:var(--text);padding:2px 4px">' + d + '</div>';
-    }
-    if (hasRdv) content += '<span style="font-size:10px;color:var(--text-light)">' + dayRdvs.length + ' rdv</span>';
-    content += '</div>';
+    html += '<div style="display:grid;grid-template-columns:36px repeat(7,1fr);min-height:120px;border-bottom:1px solid var(--border)">';
+    
+    // Week number
+    html += '<div style="display:flex;align-items:flex-start;justify-content:center;padding-top:8px;font-size:11px;color:var(--text-light);font-weight:600;border-right:1px solid var(--border);background:var(--bg)">' + weekNum + '</div>';
 
-    // Événements
-    if (hasRdv) {
-      dayRdvs.slice(0, 3).forEach(r => {
-        const color = typeColors[r.type] || 'var(--accent)';
-        content += '<div style="background:' + color + ';color:#fff;border-radius:4px;padding:2px 6px;margin:2px 0;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.4">' + (r.heure||'') + ' ' + (r.client||'') + '</div>';
+    // 7 day cells
+    for(let col = 0; col < 7; col++) {
+      const dayNum = row * 7 + col - startDow + 1;
+      const isValid = dayNum >= 1 && dayNum <= lastDay.getDate();
+      const borderRight = col < 6 ? 'border-right:1px solid var(--border);' : '';
+
+      if(!isValid) {
+        html += '<div style="background:var(--bg);' + borderRight + '"></div>';
+        continue;
+      }
+
+      const dateStr = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(dayNum).padStart(2, '0');
+      const isToday = dateStr === todayStr;
+
+      // Collect events for this day
+      const dayEvents = [];
+      
+      // Google Calendar events
+      (DB.gcalEvents || []).forEach(ev => {
+        if(dateStr >= ev.date && dateStr <= ev.endDate) {
+          dayEvents.push({
+            title: ev.title,
+            heure: ev.heure,
+            color: GCAL_COLORS[ev.colorId] || GCAL_COLORS['0'],
+            allDay: ev.allDay,
+            isMultiDay: ev.date !== ev.endDate,
+            source: 'gcal'
+          });
+        }
       });
-      if (dayRdvs.length > 3) content += '<div style="font-size:10px;color:var(--text-light);padding:2px 4px">+' + (dayRdvs.length - 3) + ' autre(s)</div>';
-    }
 
-    html += '<div style="' + style + '" onclick="showAgendaDay(\'' + dateStr + '\')" onmouseover="this.style.boxShadow=\'0 2px 8px rgba(0,0,0,0.1)\'" onmouseout="this.style.boxShadow=\'none\'">' + content + '</div>';
+      // Local RDVs (only if not already from gcal)
+      DB.rdv.filter(r => r.date === dateStr).forEach(r => {
+        const alreadyFromGcal = r.googleEventId && dayEvents.find(e => e.source === 'gcal' && e.title.includes(r.client));
+        if(!alreadyFromGcal) {
+          dayEvents.push({
+            title: (r.heure ? '' : '') + r.client,
+            heure: r.heure || '',
+            color: r.statut === 'termine' ? '#33B679' : '#4285F4',
+            allDay: false,
+            isMultiDay: false,
+            source: 'local'
+          });
+        }
+      });
+
+      // Sort: all-day first, then by time
+      dayEvents.sort((a,b) => {
+        if(a.allDay && !b.allDay) return -1;
+        if(!a.allDay && b.allDay) return 1;
+        return (a.heure||'').localeCompare(b.heure||'');
+      });
+
+      // Cell HTML
+      html += '<div style="padding:2px;cursor:pointer;overflow:hidden;' + borderRight + (isToday ? 'background:rgba(66,133,244,0.05);' : '') + '" onclick="showAgendaDay(\'' + dateStr + '\')">';
+      
+      // Day number
+      if(isToday) {
+        html += '<div style="display:flex;justify-content:center;padding:2px 0 3px"><div style="width:26px;height:26px;border-radius:50%;background:#4285F4;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700">' + dayNum + '</div></div>';
+      } else {
+        html += '<div style="text-align:center;padding:2px 0 3px;font-size:12px;font-weight:500;color:var(--text)">' + dayNum + '</div>';
+      }
+
+      // Events (max 4 visible)
+      const maxShow = 4;
+      dayEvents.slice(0, maxShow).forEach(ev => {
+        if(ev.allDay || ev.isMultiDay) {
+          // All-day: full width bar
+          html += '<div style="background:' + ev.color + ';color:#fff;font-size:10px;padding:1px 4px;margin:1px 0;border-radius:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.5">' + ev.title + '</div>';
+        } else {
+          // Timed: colored left border chip
+          html += '<div style="background:' + ev.color + '22;border-left:3px solid ' + ev.color + ';font-size:10px;padding:1px 4px;margin:1px 0;border-radius:0 3px 3px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.5;color:' + ev.color + ';font-weight:500">' + (ev.heure ? ev.heure + ' ' : '') + ev.title + '</div>';
+        }
+      });
+
+      if(dayEvents.length > maxShow) {
+        html += '<div style="font-size:10px;color:var(--text-light);padding:1px 4px;cursor:pointer">+' + (dayEvents.length - maxShow) + ' autre(s)</div>';
+      }
+
+      html += '</div>';
+    }
+    html += '</div>';
   }
 
   document.getElementById('agenda-calendar').innerHTML = html;
@@ -3731,29 +3808,78 @@ function renderAgenda() {
 }
 
 function showAgendaDay(dateStr) {
-  const dayRdvs = DB.rdv.filter(r => r.date === dateStr).sort((a,b) => (a.heure||'').localeCompare(b.heure||''));
   const dt = new Date(dateStr);
   const jours = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
   const mois = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
 
   document.getElementById('agenda-day-title').textContent = jours[dt.getDay()] + ' ' + dt.getDate() + ' ' + mois[dt.getMonth()] + ' ' + dt.getFullYear();
 
-  const typeColors = {'Consultation':'#4285F4','Parage':'#0B8043','Urgence':'#D50000','Suivi':'#F4511E','Déferrage':'#8E24AA'};
+  // Collect all events
+  const allEvents = [];
+
+  // Google Calendar events
+  (DB.gcalEvents || []).forEach(ev => {
+    if(dateStr >= ev.date && dateStr <= ev.endDate) {
+      allEvents.push({
+        title: ev.title,
+        heure: ev.heure,
+        color: GCAL_COLORS[ev.colorId] || GCAL_COLORS['0'],
+        allDay: ev.allDay,
+        location: ev.location,
+        source: 'gcal',
+        gcalId: ev.id
+      });
+    }
+  });
+
+  // Local RDVs
+  DB.rdv.filter(r => r.date === dateStr).sort((a,b) => (a.heure||'').localeCompare(b.heure||'')).forEach(r => {
+    const alreadyFromGcal = r.googleEventId && allEvents.find(e => e.gcalId === r.googleEventId);
+    if(!alreadyFromGcal) {
+      allEvents.push({
+        title: r.client,
+        heure: r.heure,
+        color: r.statut === 'termine' ? '#33B679' : '#4285F4',
+        allDay: false,
+        location: r.adresse,
+        source: 'local',
+        rdvId: r.id,
+        type: r.type,
+        duree: r.duree,
+        tarif: r.tarif,
+        statut: r.statut
+      });
+    }
+  });
+
+  // Sort
+  allEvents.sort((a,b) => {
+    if(a.allDay && !b.allDay) return -1;
+    if(!a.allDay && b.allDay) return 1;
+    return (a.heure||'').localeCompare(b.heure||'');
+  });
 
   const detail = document.getElementById('agenda-day-detail');
   const content = document.getElementById('agenda-day-content');
 
-  if (dayRdvs.length === 0) {
-    content.innerHTML = '<p style="color:var(--text-light);text-align:center;padding:24px">Aucun rendez-vous ce jour</p>';
+  if(allEvents.length === 0) {
+    content.innerHTML = '<p style="color:var(--text-light);text-align:center;padding:24px">Aucun événement ce jour</p>';
   } else {
-    content.innerHTML = dayRdvs.map(r => {
-      const color = typeColors[r.type] || 'var(--accent)';
-      const addr = r.adresse ? '<div style="font-size:12px;color:var(--text-light);margin-top:4px">📍 ' + r.adresse + '</div>' : '';
-      return '<div style="display:flex;align-items:center;gap:16px;padding:12px;background:var(--bg);border-radius:8px;margin-bottom:8px;border-left:4px solid ' + color + '">' +
-        '<div style="text-align:center;min-width:60px"><div style="font-size:18px;font-weight:700;color:' + color + '">' + r.heure + '</div><div style="font-size:11px;color:var(--text-light)">' + r.duree + ' min</div></div>' +
-        '<div style="flex:1"><div style="font-weight:600">' + r.client + '</div><div style="display:flex;gap:6px;margin-top:4px"><span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;color:#fff;background:' + color + '">' + r.type + '</span><span class="badge ' + (r.statut === 'termine' ? 'badge-paid' : 'badge-accent') + '">' + (r.statut === 'termine' ? '✓ Terminé' : '📅 Planifié') + '</span></div>' + addr + '</div>' +
-        '<div style="font-weight:700">' + (r.tarif ? euro(r.tarif) : '') + '</div>' +
-        '<div style="display:flex;gap:4px"><button class="icon-btn" onclick="addToGoogleCalendar(\'' + r.id + '\')" title="Google Agenda" style="font-size:14px">📅</button><button class="icon-btn" onclick="openRdvModal(\'' + r.id + '\')" title="Modifier">✏️</button></div>' +
+    content.innerHTML = allEvents.map(ev => {
+      const loc = ev.location ? '<div style="font-size:12px;color:var(--text-light);margin-top:4px">📍 ' + ev.location + '</div>' : '';
+      const actions = ev.rdvId ? '<div style="display:flex;gap:4px;margin-left:auto"><button class="icon-btn" onclick="openRdvModal(\'' + ev.rdvId + '\')" title="Modifier">✏️</button></div>' : '';
+      const timeInfo = ev.allDay ? '<div style="font-size:13px;font-weight:600;color:' + ev.color + '">Journée</div>' :
+        '<div style="font-size:16px;font-weight:700;color:' + ev.color + '">' + (ev.heure || '') + '</div>' + (ev.duree ? '<div style="font-size:11px;color:var(--text-light)">' + ev.duree + ' min</div>' : '');
+      const badge = ev.type ? '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;color:#fff;background:' + ev.color + ';margin-right:6px">' + ev.type + '</span>' : '';
+      const statutBadge = ev.statut ? '<span class="badge ' + (ev.statut === 'termine' ? 'badge-paid' : 'badge-accent') + '">' + (ev.statut === 'termine' ? '✓ Terminé' : '📅 Planifié') + '</span>' : '';
+      const tarifStr = ev.tarif ? '<div style="font-weight:700;margin-left:12px">' + euro(ev.tarif) + '</div>' : '';
+
+      return '<div style="display:flex;align-items:center;gap:14px;padding:12px;background:var(--bg);border-radius:8px;margin-bottom:8px;border-left:4px solid ' + ev.color + '">' +
+        '<div style="text-align:center;min-width:55px">' + timeInfo + '</div>' +
+        '<div style="flex:1"><div style="font-weight:600;font-size:14px">' + ev.title + '</div>' +
+        (badge || statutBadge ? '<div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap">' + badge + statutBadge + '</div>' : '') +
+        loc + '</div>' +
+        tarifStr + actions +
       '</div>';
     }).join('');
   }
@@ -4509,7 +4635,39 @@ async function fullSyncGoogleCalendar() {
       }
     }
 
-    // 4) Rafraîchir l'affichage
+    // 4) Stocker TOUS les événements Google pour l'affichage calendrier
+    DB.gcalEvents = googleEvents.filter(e => e.status !== 'cancelled').map(e => {
+      let date = '', endDate = '', heure = '', allDay = false;
+      if(e.start?.dateTime) {
+        const dt = new Date(e.start.dateTime);
+        date = dt.toISOString().split('T')[0];
+        heure = String(dt.getHours()).padStart(2,'0') + ':' + String(dt.getMinutes()).padStart(2,'0');
+        if(e.end?.dateTime) endDate = new Date(e.end.dateTime).toISOString().split('T')[0];
+        else endDate = date;
+      } else if(e.start?.date) {
+        date = e.start.date;
+        endDate = e.end?.date || date;
+        // Google end date for all-day is exclusive, so subtract 1 day
+        if(endDate > date) {
+          const ed = new Date(endDate);
+          ed.setDate(ed.getDate() - 1);
+          endDate = ed.toISOString().split('T')[0];
+        }
+        allDay = true;
+      }
+      return {
+        id: e.id,
+        title: e.summary || '(Sans titre)',
+        date: date,
+        endDate: endDate || date,
+        heure: heure,
+        allDay: allDay,
+        colorId: e.colorId || '0',
+        location: e.location || ''
+      };
+    });
+
+    // 5) Rafraîchir l'affichage
     renderRdv();
     renderAgenda();
 
