@@ -464,15 +464,34 @@ body.dark .login-input { background:#111827; color:#f3f4f6; border-color:#374151
   <div class="page-header">
     <div>
       <h1 class="page-title">Chevaux</h1>
-      <p class="page-subtitle">Gérez les chevaux de vos clients</p>
+      <p class="page-subtitle" id="chevaux-subtitle">Gérez les chevaux de vos clients</p>
     </div>
     <button class="btn btn-primary" onclick="openChevalModal()">＋ Nouveau cheval</button>
   </div>
-  <div class="search-bar">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-    <input type="text" id="cheval-search" placeholder="Rechercher un cheval..." oninput="renderChevaux()">
+  <div id="chevaux-stats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px"></div>
+  <div style="display:flex;gap:12px;align-items:center;margin-bottom:20px;flex-wrap:wrap">
+    <div class="search-bar" style="flex:1;margin-bottom:0;min-width:200px">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      <input type="text" id="cheval-search" placeholder="Rechercher par nom ou propriétaire..." oninput="renderChevaux()">
+    </div>
+    <div class="filter-tabs" id="cheval-filters">
+      <button class="filter-tab active" onclick="setChevalFilter('tous',this)">Tous</button>
+      <button class="filter-tab" onclick="setChevalFilter('Cheval',this)">🐴 Chevaux</button>
+      <button class="filter-tab" onclick="setChevalFilter('Poney',this)">🐴 Poneys</button>
+      <button class="filter-tab" onclick="setChevalFilter('Âne',this)">🫏 Ânes</button>
+    </div>
+    <select id="cheval-sort" onchange="renderChevaux()" style="padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;background:#fff;cursor:pointer">
+      <option value="proprietaire">Tri: Propriétaire</option>
+      <option value="nom">Tri: Nom A→Z</option>
+      <option value="type">Tri: Type</option>
+      <option value="rappel">Tri: Rappel urgent</option>
+    </select>
+    <button id="cheval-view-toggle" class="btn btn-secondary btn-sm" onclick="toggleChevalView()" style="white-space:nowrap">📋 Vue liste</button>
   </div>
   <div id="chevaux-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px"></div>
+  <div id="chevaux-table-wrap" style="display:none"><div class="card" style="padding:0;overflow:hidden"><table><thead><tr>
+    <th style="width:40px"></th><th>Nom</th><th>Propriétaire</th><th>Type</th><th>Race</th><th>Dernier soin</th><th>Rappel</th><th style="text-align:right">Actions</th>
+  </tr></thead><tbody id="chevaux-tbody"></tbody></table></div></div>
   <div id="chevaux-empty" style="display:none;text-align:center;padding:32px;color:var(--text-light)">Aucun cheval trouvé</div>
 </div>
 
@@ -1409,7 +1428,7 @@ function getClientCode(c) {
   if(c.code) return c.code;
   if(CLIENT_CODES[c.nom]) return CLIENT_CODES[c.nom];
   // Fallback: recherche insensible à la casse et aux apostrophes
-  const normalize = s => (s||'').toLowerCase().replace(/[\u2019\u2018'`]/g, "'");
+  const normalize = s => (s||'').toLowerCase().replace(/[\u2019\u2018']/g, "'");
   const nomN = normalize(c.nom);
   for(const [k,v] of Object.entries(CLIENT_CODES)) { if(normalize(k) === nomN) return v; }
   return 'C?????';
@@ -1859,53 +1878,198 @@ function viewClientFiche(id) {
    SECTION JS : CHEVAUX
    ══════════════════════════════════════════ */
 
+let _chevalFilter = 'tous';
+let _chevalView = 'cards'; // 'cards' ou 'table'
+
+function setChevalFilter(f, btn) {
+  _chevalFilter = f;
+  document.querySelectorAll('#cheval-filters .filter-tab').forEach(b => b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  renderChevaux();
+}
+
+function toggleChevalView() {
+  _chevalView = _chevalView === 'cards' ? 'table' : 'cards';
+  const btn = document.getElementById('cheval-view-toggle');
+  btn.textContent = _chevalView === 'cards' ? '📋 Vue liste' : '🔲 Vue cartes';
+  renderChevaux();
+}
+
+function getChevalRappel(ch) {
+  const chevalRdvs = DB.rdv.filter(r => {
+    const rNorm = (r.client||'').toLowerCase();
+    const propNorm = (ch.proprietaire||'').toLowerCase();
+    return (rNorm === propNorm) && r.statut === 'termine';
+  }).sort((a,b) => new Date(b.date) - new Date(a.date));
+  const lastParage = chevalRdvs.find(r => (r.type||'').toLowerCase().includes('parage'));
+  if(!lastParage) return { lastParage: null, daysLeft: null, status: 'none' };
+  const daysSince = Math.floor((new Date() - new Date(lastParage.date)) / 86400000);
+  const interval = ch.type && ch.type.includes('Poney') ? 56 : 49;
+  const daysLeft = interval - daysSince;
+  const status = daysLeft < 0 ? 'overdue' : daysLeft <= 7 ? 'soon' : 'ok';
+  return { lastParage, daysLeft, daysSince, status };
+}
+
+function rappelBadge(r) {
+  if(r.status === 'none') return '<span style="font-size:12px;color:var(--text-light)">—</span>';
+  if(r.status === 'overdue') return '<span class="rappel-badge rappel-overdue">⚠ Retard ' + Math.abs(r.daysLeft) + 'j</span>';
+  if(r.status === 'soon') return '<span class="rappel-badge rappel-soon">⏰ ' + r.daysLeft + 'j</span>';
+  return '<span class="rappel-badge rappel-ok">✓ ' + r.daysLeft + 'j</span>';
+}
+
 function renderChevaux() {
   const search = (document.getElementById('cheval-search')?.value||'').toLowerCase();
-  const filtered = DB.chevaux.filter(c=>c.nom.toLowerCase().includes(search));
+  let filtered = DB.chevaux.filter(c => 
+    c.nom.toLowerCase().includes(search) || 
+    (c.proprietaire||'').toLowerCase().includes(search) ||
+    (c.type||'').toLowerCase().includes(search) ||
+    (c.race||'').toLowerCase().includes(search)
+  );
+
+  // Filtre par type
+  if(_chevalFilter !== 'tous') {
+    filtered = filtered.filter(c => (c.type||'').includes(_chevalFilter));
+  }
+
+  // Enrichir avec rappel
+  const enriched = filtered.map(ch => ({ ...ch, rappel: getChevalRappel(ch) }));
+
+  // Tri
+  const sort = document.getElementById('cheval-sort')?.value || 'proprietaire';
+  enriched.sort((a,b) => {
+    if(sort === 'nom') return a.nom.localeCompare(b.nom, 'fr');
+    if(sort === 'type') return (a.type||'').localeCompare(b.type||'', 'fr') || a.nom.localeCompare(b.nom, 'fr');
+    if(sort === 'rappel') {
+      const scoreA = a.rappel.status === 'overdue' ? 0 : a.rappel.status === 'soon' ? 1 : a.rappel.status === 'ok' ? 2 : 3;
+      const scoreB = b.rappel.status === 'overdue' ? 0 : b.rappel.status === 'soon' ? 1 : b.rappel.status === 'ok' ? 2 : 3;
+      return scoreA - scoreB || (a.rappel.daysLeft||999) - (b.rappel.daysLeft||999);
+    }
+    // Par défaut: propriétaire
+    return (a.proprietaire||'').localeCompare(b.proprietaire||'', 'fr') || a.nom.localeCompare(b.nom, 'fr');
+  });
+
+  // Stats
+  const total = DB.chevaux.length;
+  const nbChevaux = DB.chevaux.filter(c => c.type === 'Cheval').length;
+  const nbPoneys = DB.chevaux.filter(c => (c.type||'').includes('Poney')).length;
+  const nbAnes = DB.chevaux.filter(c => c.type === 'Âne').length;
+  const nbOverdue = DB.chevaux.filter(c => getChevalRappel(c).status === 'overdue').length;
+  const nbSoon = DB.chevaux.filter(c => getChevalRappel(c).status === 'soon').length;
+
+  document.getElementById('chevaux-stats').innerHTML = `
+    <div class="stat-card" style="background:var(--bg)"><div><div class="stat-value">${total}</div><div class="stat-label">Total</div></div></div>
+    <div class="stat-card" style="background:#fef3e2"><div><div class="stat-value" style="color:var(--accent)">${nbChevaux}</div><div class="stat-label">Chevaux</div></div></div>
+    <div class="stat-card" style="background:#e8f4fd"><div><div class="stat-value" style="color:var(--info)">${nbPoneys}</div><div class="stat-label">Poneys</div></div></div>
+    <div class="stat-card" style="background:#f0fdf4"><div><div class="stat-value" style="color:var(--success)">${nbAnes}</div><div class="stat-label">Ânes</div></div></div>
+    ${nbOverdue > 0 ? '<div class="stat-card" style="background:var(--danger-bg)"><div><div class="stat-value" style="color:var(--danger)">' + nbOverdue + '</div><div class="stat-label">⚠ En retard</div></div></div>' : ''}
+    ${nbSoon > 0 ? '<div class="stat-card" style="background:#fffbeb"><div><div class="stat-value" style="color:#d97706">' + nbSoon + '</div><div class="stat-label">⏰ Bientôt</div></div></div>' : ''}
+  `;
+
+  document.getElementById('chevaux-subtitle').textContent = filtered.length + ' cheva' + (filtered.length > 1 ? 'ux' : 'l') + ' sur ' + total;
+
   const grid = document.getElementById('chevaux-grid');
+  const tableWrap = document.getElementById('chevaux-table-wrap');
+  const tbody = document.getElementById('chevaux-tbody');
   const empty = document.getElementById('chevaux-empty');
 
-  if(filtered.length===0) { grid.innerHTML=''; empty.style.display='block'; return; }
-  empty.style.display='none';
+  if(enriched.length === 0) {
+    grid.style.display = 'none'; tableWrap.style.display = 'none'; empty.style.display = 'block'; return;
+  }
+  empty.style.display = 'none';
 
-  grid.innerHTML = filtered.map(ch => {
-    // Historique des interventions
-    const chevalRdvs = DB.rdv.filter(r => {
-      const rNorm = (r.client||'').toLowerCase();
-      const propNorm = (ch.proprietaire||'').toLowerCase();
-      return (rNorm.includes(propNorm) || propNorm.includes(rNorm)) && r.statut === 'termine';
-    }).sort((a,b) => new Date(b.date) - new Date(a.date));
+  const typeIcon = t => (t||'').includes('Poney') ? '🐴' : t === 'Âne' ? '🫏' : '🐴';
+  const typeColor = t => (t||'').includes('Poney') ? '#3b82f6' : t === 'Âne' ? '#22c55e' : 'var(--accent)';
 
-    const lastParage = chevalRdvs.find(r => (r.type||'').toLowerCase().includes('parage'));
-    let rappelHtml = '';
-    if(lastParage) {
-      const daysSince = Math.floor((new Date() - new Date(lastParage.date)) / 86400000);
-      const interval = ch.type && ch.type.includes('Poney') ? 56 : 49;
-      const daysLeft = interval - daysSince;
-      if(daysLeft < 0) rappelHtml = '<span class="rappel-badge rappel-overdue">⚠ Retard ' + Math.abs(daysLeft) + 'j</span>';
-      else if(daysLeft <= 7) rappelHtml = '<span class="rappel-badge rappel-soon">⏰ ' + daysLeft + 'j</span>';
-      else rappelHtml = '<span class="rappel-badge rappel-ok">✓ ' + daysLeft + 'j</span>';
+  if(_chevalView === 'cards') {
+    grid.style.display = 'grid'; tableWrap.style.display = 'none';
+
+    // Grouper par propriétaire si tri = propriétaire
+    if(sort === 'proprietaire') {
+      const groups = {};
+      enriched.forEach(ch => {
+        const key = ch.proprietaire || 'Sans propriétaire';
+        if(!groups[key]) groups[key] = [];
+        groups[key].push(ch);
+      });
+
+      grid.style.gridTemplateColumns = '1fr';
+      grid.innerHTML = Object.entries(groups).map(([owner, horses]) => {
+        const client = DB.clients.find(c => c.nom === owner);
+        const code = client ? getClientCode(client) : '';
+        return `
+        <div style="margin-bottom:8px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid var(--accent)">
+            <div style="width:36px;height:36px;border-radius:8px;background:var(--accent);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:13px">${horses.length}</div>
+            <div style="flex:1"><span style="font-weight:700;font-size:15px">${owner}</span>${code ? ' <span style="font-size:12px;color:var(--text-light);font-family:monospace">' + code + '</span>' : ''}</div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px">
+            ${horses.map(ch => `
+              <div class="card" style="margin-bottom:0;border-left:4px solid ${typeColor(ch.type)}">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+                  <span style="font-size:22px">${typeIcon(ch.type)}</span>
+                  <div style="flex:1">
+                    <div style="font-weight:700;font-size:15px;text-transform:capitalize">${ch.nom}</div>
+                    <div style="font-size:12px;color:var(--text-light)">${ch.type||'Non défini'}${ch.race?' · '+ch.race:''}${ch.age?' · '+ch.age:''}</div>
+                  </div>
+                  ${rappelBadge(ch.rappel)}
+                </div>
+                ${ch.rappel.lastParage ? '<div style="font-size:12px;color:var(--text-light);margin-bottom:4px">Dernier soin: ' + formatDate(ch.rappel.lastParage.date) + ' (' + ch.rappel.lastParage.type + ')</div>' : ''}
+                ${ch.notes ? '<div style="font-size:12px;padding:6px 8px;background:var(--bg);border-radius:6px;color:var(--text-light);margin-bottom:4px">' + ch.notes + '</div>' : ''}
+                <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+                  <button class="btn btn-secondary btn-sm" onclick="openChevalFiche('${ch.id}')" style="font-size:11px">📋 Fiche</button>
+                  <button class="icon-btn" onclick="openChevalModal('${ch.id}')" style="font-size:14px">✏️</button>
+                  <button class="icon-btn" onclick="deleteCheval('${ch.id}')" style="font-size:14px">🗑️</button>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>`;
+      }).join('');
+    } else {
+      grid.style.gridTemplateColumns = 'repeat(auto-fill,minmax(300px,1fr))';
+      grid.innerHTML = enriched.map(ch => `
+        <div class="card" style="margin-bottom:0;border-left:4px solid ${typeColor(ch.type)}">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+            <span style="font-size:22px">${typeIcon(ch.type)}</span>
+            <div style="flex:1">
+              <div style="font-weight:700;font-size:15px;text-transform:capitalize">${ch.nom}</div>
+              <div style="font-size:12px;color:var(--text-light)">${ch.proprietaire}</div>
+            </div>
+            ${rappelBadge(ch.rappel)}
+          </div>
+          <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--text-light);margin-bottom:8px">
+            <span style="background:var(--bg);padding:2px 8px;border-radius:10px">${ch.type||'Non défini'}</span>
+            ${ch.race?'<span style="background:var(--bg);padding:2px 8px;border-radius:10px">'+ch.race+'</span>':''}
+            ${ch.age?'<span style="background:var(--bg);padding:2px 8px;border-radius:10px">'+ch.age+'</span>':''}
+          </div>
+          ${ch.rappel.lastParage ? '<div style="font-size:12px;color:var(--text-light);margin-bottom:4px">Dernier soin: ' + formatDate(ch.rappel.lastParage.date) + '</div>' : ''}
+          ${ch.notes ? '<div style="font-size:12px;padding:6px 8px;background:var(--bg);border-radius:6px;color:var(--text-light);margin-bottom:4px">' + ch.notes + '</div>' : ''}
+          <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+            <button class="btn btn-secondary btn-sm" onclick="openChevalFiche('${ch.id}')" style="font-size:11px">📋 Fiche</button>
+            <button class="icon-btn" onclick="openChevalModal('${ch.id}')" style="font-size:14px">✏️</button>
+            <button class="icon-btn" onclick="deleteCheval('${ch.id}')" style="font-size:14px">🗑️</button>
+          </div>
+        </div>
+      `).join('');
     }
-
-    return `
-    <div class="card" style="margin-bottom:0">
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
-        <div style="width:48px;height:48px;border-radius:10px;background:#fef3e2;display:flex;align-items:center;justify-content:center;font-size:24px">🐴</div>
-        <div style="flex:1"><div style="font-weight:700;font-size:16px">${ch.nom}</div><div style="font-size:13px;color:var(--text-light)">${ch.proprietaire}</div></div>
-        ${rappelHtml}
-      </div>
-      <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:13px;color:var(--accent)">Type</span><span style="font-size:13px;font-weight:600">${ch.type||'Non défini'}</span></div>
-      ${ch.race?`<div style="display:flex;justify-content:space-between;margin-top:6px"><span style="font-size:13px;color:var(--text-light)">Race</span><span style="font-size:13px">${ch.race}</span></div>`:''}
-      ${ch.age?`<div style="display:flex;justify-content:space-between;margin-top:6px"><span style="font-size:13px;color:var(--text-light)">Âge</span><span style="font-size:13px">${ch.age}</span></div>`:''}
-      ${lastParage?`<div style="display:flex;justify-content:space-between;margin-top:6px"><span style="font-size:13px;color:var(--text-light)">Dernier soin</span><span style="font-size:13px">${formatDate(lastParage.date)} (${lastParage.type})</span></div>`:''}
-      ${ch.notes?`<div style="margin-top:8px;padding:8px;background:var(--bg);border-radius:6px;font-size:12px;color:var(--text-light)">${ch.notes}</div>`:''}
-      <div style="display:flex;gap:8px;margin-top:12px;border-top:1px solid var(--border);padding-top:10px">
-        <button class="btn btn-secondary btn-sm" onclick="openChevalFiche('${ch.id}')" style="flex:1;font-size:12px">📋 Fiche complète</button>
-        <button class="icon-btn" onclick="openChevalModal('${ch.id}')">✏️</button>
-        <button class="icon-btn" onclick="deleteCheval('${ch.id}')">🗑️</button>
-      </div>
-    </div>`;
-  }).join('');
+  } else {
+    // Vue tableau
+    grid.style.display = 'none'; tableWrap.style.display = 'block';
+    tbody.innerHTML = enriched.map((ch, idx) => `<tr style="background:${idx%2===0?'transparent':'var(--bg)'}">
+      <td style="text-align:center;font-size:18px">${typeIcon(ch.type)}</td>
+      <td><span style="font-weight:700;text-transform:capitalize">${ch.nom}</span></td>
+      <td>${ch.proprietaire||''}</td>
+      <td><span style="font-size:12px;padding:2px 8px;border-radius:10px;background:var(--bg);white-space:nowrap">${ch.type||'—'}</span></td>
+      <td style="font-size:13px">${ch.race||'—'}</td>
+      <td style="font-size:12px">${ch.rappel.lastParage ? formatDate(ch.rappel.lastParage.date) : '—'}</td>
+      <td>${rappelBadge(ch.rappel)}</td>
+      <td style="text-align:right;white-space:nowrap">
+        <button class="icon-btn" onclick="openChevalFiche('${ch.id}')" style="font-size:13px">📋</button>
+        <button class="icon-btn" onclick="openChevalModal('${ch.id}')" style="font-size:13px">✏️</button>
+        <button class="icon-btn" onclick="deleteCheval('${ch.id}')" style="font-size:13px">🗑️</button>
+      </td>
+    </tr>`).join('');
+  }
 }
 
 function openChevalModal(id) {
