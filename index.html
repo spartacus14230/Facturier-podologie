@@ -624,13 +624,15 @@ body.dark .login-input { background:#111827; color:#f3f4f6; border-color:#374151
   <div class="page-header">
     <div>
       <h1 class="page-title">Comparatif Annuel</h1>
-      <p class="page-subtitle">Comparez vos performances entre deux années</p>
+      <p class="page-subtitle">Comparez vos performances sur 3 années</p>
     </div>
-    <div style="display:flex;gap:12px;align-items:center">
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
       <span style="font-size:13px;font-weight:600">Année 1:</span>
       <select id="comp-year1" style="width:100px" onchange="renderComparatif()"></select>
       <span style="font-size:13px;font-weight:600">Année 2:</span>
       <select id="comp-year2" style="width:100px" onchange="renderComparatif()"></select>
+      <span style="font-size:13px;font-weight:600">Année 3:</span>
+      <select id="comp-year3" style="width:100px" onchange="renderComparatif()"></select>
     </div>
   </div>
   <div id="comparatif-content"></div>
@@ -887,66 +889,66 @@ body.dark .login-input { background:#111827; color:#f3f4f6; border-color:#374151
 let DB = {
   _version: 2,
   clients: [
-    { id:"c1", nom:"Centre équestre de Beaurouvre", telephone:"", email:"florence.colas78@orange.fr", adresse:"ferme Beaurouvres, 28120 BLANDAINVILLE" },
-    { id:"c2", nom:"Centre equestres de la Lys", telephone:"0660120276", email:"cedelalys@gmail.com", adresse:"Le longchamp, 61100 Notre Dame du Rocher" },
-    { id:"c3", nom:"Cheuvry-Gilbert Lucie", telephone:"0750913703", email:"lucie.cheuvrygilbert@gmail.com", adresse:"L'Auberge, 61220 Saint André de Briouze" },
-    { id:"c4", nom:"Van-Cleemput Cecile", telephone:"0647758443", email:"cecile.van-cleemput@hotmail.fr", adresse:"3 lieu dit la Bardoulière, 61100 Landigou" },
-    { id:"c5", nom:"Lecocq Ilona", telephone:"0789496537", email:"ilonalecocq.il@gmail.com", adresse:"Saint Marc d'ouilly 1 route de galerne, 14690 Pont D'Ouilly" },
-    { id:"c6", nom:"SCEA du Parc Chamfray", telephone:"0685385783", email:"Jufabplara@gmail.com", adresse:"55 chemin du parc Chamfray, 72610 Chamfleur" },
-    { id:"c7", nom:"ARVIER Sylvie", telephone:"0683346436", email:"sylvie.arvier123@gmail.com", adresse:"la branle , 61430 menil hubert sur orne" },
-    { id:"c8", nom:"LAUNAY Marie christine", telephone:"0630374435", email:"mc.launay@wanadoo.fr", adresse:"23 avenue Charles de gaulle, 61100 SAINT GEORGES des Groseillers" },
-    { id:"c9", nom:"GRANDJEAN Lydia", telephone:"0608581384", email:"lydia.grandjean@free.fr", adresse:"" },
-    { id:"c10", nom:"MOREAU Marie", telephone:"", email:"duriezmarie@lice.fr", adresse:"1 le croix chemin, 28160 UNVERRE" },
-    { id:"c11", nom:"Haras de Cresme", telephone:"0652662404", email:"harasdecresme@gmail.com", adresse:"Moulin de cresme, 14770 St Pierre la Vieille" },
-    { id:"c12", nom:"EARL ferme de la basse BIGNETIERE", telephone:"", email:"denis.humbertclaude@gmail.com", adresse:"14770 St Pierre la Vieille" },
-    { id:"c13", nom:"Anne-Laure Deraine", telephone:"", email:"deraineannelaure@gmail.com", adresse:"12 voie de l'épine, 14610 Fontaine-Henry" },
-    { id:"c14", nom:"GUYONNET Marie", telephone:"", email:"marie.guyonnet1@gmail.com", adresse:"lieu dit la boderie, 61430 Sainte honorine la chardonne" },
-    { id:"c15", nom:"HOUEL Marion", telephone:"", email:"marionmeray@hotmail.com", adresse:"la dumainerie, 61800 Saint cornier des landes" },
-    { id:"c16", nom:"FEKKAK Lydie", telephone:"", email:"", adresse:"Les tilleuls du fay, 61600 La Ferté Macé" },
-    { id:"c17", nom:"GASSE Magali", telephone:"0609369065", email:"magali.gasse@icloud.com", adresse:"38 rue des bellangeres, 28630 le Coudray" },
-    { id:"c18", nom:"LELOUP Adeline", telephone:"", email:"adline14@hotmail.fr", adresse:"38 rue du parc, 14210 Montillières sur Orne" },
-    { id:"c19", nom:"SARL Académie de l’Audace", telephone:"", email:"contact@laparentheseverte.org", adresse:"4 Le Breuil, 50160 Lamberville" },
-    { id:"c20", nom:"Association La Parenthèse Verte", telephone:"", email:"contact@laparentheseverte.org", adresse:"31 les vaux, 50160 Lamberville" },
-    { id:"c21", nom:"ROLOT Noémie", telephone:"", email:"noemie.rolot@laposte.net", adresse:"290 chemin de la ferme du buisson, 14260 ST Pierre du fresne" },
-    { id:"c22", nom:"GUILLOUX Alicia", telephone:"", email:"aliciaguilloux@yahoo.com", adresse:"7 rue chales, 89190 Molinons" },
-    { id:"c23", nom:"Isaac Hamon", telephone:"0783191280", email:"hamonisaac0@gmail.com", adresse:"1 rue André Lenormand, 14540 Grentheville" },
-    { id:"c24", nom:"ROSSI Clémence", telephone:"0669441578", email:"clemence.rossi@hotmail.fr", adresse:"1 bis rue de la houllegate, 50440 BEAUMONT HAGUE" },
-    { id:"c25", nom:"PELLINGHELLI Amélie", telephone:"0675696142", email:"enzopell@hotmail.fr", adresse:"12 rue de condom, 14250 Tilly sur seulle" },
-    { id:"c26", nom:"PALOC Amélia", telephone:"0687681807", email:"amelia.paloc@gmail.com", adresse:"centre equestre de Kerblanquet, 56370 SARZEAU" },
-    { id:"c27", nom:"GINESTY Laetitia", telephone:"0681727558", email:"laetig61@yahoo.fr", adresse:"6 clos de l'etang, 61450 LE CHATELLIER" },
-    { id:"c28", nom:"ROHEE Lucie", telephone:"0683182670", email:"lucie.gohier14@gmail.com", adresse:"535E route des cretes, 61100 AUBUSSON" },
-    { id:"c29", nom:"GUELTON Bruno", telephone:"0611970077", email:"bruno.guelton@orange.fr", adresse:"5 le douet , 50480 Écoquenéauville" },
-    { id:"c30", nom:"GERMEYS Dominique", telephone:"0677788864", email:"laeticia.cenni@gmail.com", adresse:"la picotière, 50420 Beuvrigny" },
-    { id:"c31", nom:"BREANT Sophie", telephone:"", email:"sophie.breant@peacok.net", adresse:"moulin de masson, 28120 Saint Avit les Guespières" },
-    { id:"c32", nom:"FRANÇOISE Ketty", telephone:"0761442916", email:"ketty.francoise@hotmail.fr", adresse:"8 rue de l'eglise, 14700 MARTIGNY SUR L'ANTE" },
-    { id:"c33", nom:"LEROY Juliette", telephone:"", email:"juliette0leroy@gmail.com", adresse:"180 la croix huet athis de l'orne, 61430 ATHIS VAL DE ROUVRE" },
-    { id:"c34", nom:"BERTOZZI Isabelle", telephone:"", email:"bertozzi.isabelle@gmail.com", adresse:"20 chemin de la foligny, 61500 AUNOU sur Orne" },
-    { id:"c35", nom:"ECURIE du Merisier DEBARGE Adrien", telephone:"0612957954", email:"ecuriesdumerisier@icloud.com", adresse:"831Route de courtandin, 14240 CORMOLAIN" },
-    { id:"c36", nom:"LAISNEY Laure", telephone:"", email:"laurelaisney3@gmail.com", adresse:"5 rue havin, 50160 TORIGNY les Villes" },
-    { id:"c37", nom:"Elevage d\'Aume", telephone:"", email:"contact@elevagedaume.fr", adresse:"14710 Formigny" },
-    { id:"c38", nom:"OLIVIER Gabrielle", telephone:"", email:"omilie@hotmail.fr", adresse:"lieu dit le moulin ouf, 14490 Le TRONQUAY" },
-    { id:"c39", nom:"BUSTANY Sophie", telephone:"", email:"", adresse:"" },
-    { id:"c40", nom:"LETORTU Laure", telephone:"", email:"", adresse:"" },
-    { id:"c41", nom:"QUINDRY Céline", telephone:"", email:"", adresse:"" },
-    { id:"c42", nom:"LOLIC Sylvie", telephone:"", email:"", adresse:"" },
-    { id:"c43", nom:"VANROSS Elisabeth", telephone:"", email:"", adresse:"la bonhommerie, 50190 MILLIERE" },
-    { id:"c44", nom:"fab", telephone:"", email:"", adresse:"" },
-    { id:"c45", nom:"LECANU Stephanie", telephone:"", email:"stephanie@jardinet.fr", adresse:"5 rue des brunelles, 14400 St Martin des entrées" },
-    { id:"c46", nom:"AUBRY Justine", telephone:"", email:"justineaby11@gmail.com", adresse:"590 Avenue de la paix, 06190 Roquebrune cap martin" },
-    { id:"c47", nom:"DOURNON Linda", telephone:"", email:"linda@dournon.com", adresse:"5 route des roques, 50490 La ronde haye St sauveur village" },
-    { id:"c48", nom:"COUÉ Elodie", telephone:"0617504287", email:"elodie.coue@sfr.fr", adresse:"7b rue de la dîme, 14700 MARTIGNY SUR L'ANTE" },
-    { id:"c49", nom:"Chauvière auvray Lison", telephone:"0627422737", email:"mathildeauvray@yahoo.fr", adresse:"la bardouliere, 61100 LANDIGOU" },
-    { id:"c50", nom:"DERAINE Daniel El", telephone:"0750404077", email:"batistederaine@gmail.com", adresse:"12 voie de l'epine, 14610 Fontaine Henry" },
-    { id:"c51", nom:"EARL DIJS", telephone:"", email:"earldijs@gmail.com", adresse:"1230 route de cormolain, 14240 Caumont sur Aure" },
-    { id:"c52", nom:"COLAS Lemire Nathalie", telephone:"0783946936", email:"nathalie.colas_lemire@unicaen.fr", adresse:"20 rue des jardins, 14740 Thue et Mue" },
-    { id:"c53", nom:"BALLIERE Aurore", telephone:"0666206996", email:"adechabot@hotmail.com", adresse:"33 rue jules dalou, 92240 MALAKOFF" },
-    { id:"c54", nom:"OCHI Chritine", telephone:"0682645685", email:"contact.ochi@laposte.net", adresse:"7 rue de la tuilerie, 28630  Le COUDRAY" },
-    { id:"c55", nom:"AULLEN Françoise", telephone:"", email:"franzy68@gmail.com", adresse:"1 venelle du chene, 14690 Pont D'Ouilly" },
-    { id:"c56", nom:"TOURNIER Manuela", telephone:"0632814752", email:"manuela.tournier@hotmail.com", adresse:"1525 route de vauquelin La boutinière, 61210 Putanges-le-Lac" },
-    { id:"c57", nom:"TARENTOLA Hélène", telephone:"0650206317", email:"h.tarentola@gmail.com", adresse:"6 rue Emilie vicq, 61100 FLERS" },
-    { id:"c58", nom:"DELAHAYE Marion", telephone:"", email:"mdelahaye55@gmail.com", adresse:"1 lieu dit chatignou la carneille, 61100  ATHIS VAL DE ROUVRE" },
-    { id:"c59", nom:"GAUQUELIN Jean luc", telephone:"", email:"jean-luc.gauquelin@orange.fr", adresse:"102 chemin du moulin, 14250 CHOUAIN" },
-    { id:"c60", nom:"LE BERRE Fanny", telephone:"0770019169", email:"fannyleberre90@gmail.com", adresse:"10 rue de la gare, 50190  MILLIERE" },
+    { id:"c1", code:"C00082", nom:"Centre équestre de Beaurouvre", telephone:"", email:"florence.colas78@orange.fr", adresse:"ferme Beaurouvres, 28120 BLANDAINVILLE" },
+    { id:"c2", code:"C00092", nom:"Centre equestres de la Lys", telephone:"0660120276", email:"cedelalys@gmail.com", adresse:"Le longchamp, 61100 Notre Dame du Rocher" },
+    { id:"c3", code:"C00093", nom:"Cheuvry-Gilbert Lucie", telephone:"0750913703", email:"lucie.cheuvrygilbert@gmail.com", adresse:"L'Auberge, 61220 Saint André de Briouze" },
+    { id:"c4", code:"C00094", nom:"Van-Cleemput Cecile", telephone:"0647758443", email:"cecile.van-cleemput@hotmail.fr", adresse:"3 lieu dit la Bardoulière, 61100 Landigou" },
+    { id:"c5", code:"C00095", nom:"Lecocq Ilona", telephone:"0789496537", email:"ilonalecocq.il@gmail.com", adresse:"Saint Marc d'ouilly 1 route de galerne, 14690 Pont D'Ouilly" },
+    { id:"c6", code:"C00099", nom:"SCEA du Parc Chamfray", telephone:"0685385783", email:"Jufabplara@gmail.com", adresse:"55 chemin du parc Chamfray, 72610 Chamfleur" },
+    { id:"c7", code:"C00113", nom:"ARVIER Sylvie", telephone:"0683346436", email:"sylvie.arvier123@gmail.com", adresse:"la branle , 61430 menil hubert sur orne" },
+    { id:"c8", code:"C00117", nom:"LAUNAY Marie christine", telephone:"0630374435", email:"mc.launay@wanadoo.fr", adresse:"23 avenue Charles de gaulle, 61100 SAINT GEORGES des Groseillers" },
+    { id:"c9", code:"C00123", nom:"GRANDJEAN Lydia", telephone:"0608581384", email:"lydia.grandjean@free.fr", adresse:"" },
+    { id:"c10", code:"C00128", nom:"MOREAU Marie", telephone:"", email:"duriezmarie@lice.fr", adresse:"1 le croix chemin, 28160 UNVERRE" },
+    { id:"c11", code:"C00132", nom:"Haras de Cresme", telephone:"0652662404", email:"harasdecresme@gmail.com", adresse:"Moulin de cresme, 14770 St Pierre la Vieille" },
+    { id:"c12", code:"C00133", nom:"EARL ferme de la basse BIGNETIERE", telephone:"", email:"denis.humbertclaude@gmail.com", adresse:"14770 St Pierre la Vieille" },
+    { id:"c13", code:"C00134", nom:"Anne-Laure Deraine", telephone:"", email:"deraineannelaure@gmail.com", adresse:"12 voie de l'épine, 14610 Fontaine-Henry" },
+    { id:"c14", code:"C00135", nom:"GUYONNET Marie", telephone:"", email:"marie.guyonnet1@gmail.com", adresse:"lieu dit la boderie, 61430 Sainte honorine la chardonne" },
+    { id:"c15", code:"C00136", nom:"HOUEL Marion", telephone:"", email:"marionmeray@hotmail.com", adresse:"la dumainerie, 61800 Saint cornier des landes" },
+    { id:"c16", code:"C00137", nom:"FEKKAK Lydie", telephone:"", email:"", adresse:"Les tilleuls du fay, 61600 La Ferté Macé" },
+    { id:"c17", code:"C00138", nom:"GASSE Magali", telephone:"0609369065", email:"magali.gasse@icloud.com", adresse:"38 rue des bellangeres, 28630 le Coudray" },
+    { id:"c18", code:"C00139", nom:"LELOUP Adeline", telephone:"", email:"adline14@hotmail.fr", adresse:"38 rue du parc, 14210 Montillières sur Orne" },
+    { id:"c19", code:"C00140", nom:"SARL Académie de l’Audace", telephone:"", email:"contact@laparentheseverte.org", adresse:"4 Le Breuil, 50160 Lamberville" },
+    { id:"c20", code:"C00141", nom:"Association La Parenthèse Verte", telephone:"", email:"contact@laparentheseverte.org", adresse:"31 les vaux, 50160 Lamberville" },
+    { id:"c21", code:"C00142", nom:"ROLOT Noémie", telephone:"", email:"noemie.rolot@laposte.net", adresse:"290 chemin de la ferme du buisson, 14260 ST Pierre du fresne" },
+    { id:"c22", code:"C00143", nom:"GUILLOUX Alicia", telephone:"", email:"aliciaguilloux@yahoo.com", adresse:"7 rue chales, 89190 Molinons" },
+    { id:"c23", code:"C00144", nom:"Isaac Hamon", telephone:"0783191280", email:"hamonisaac0@gmail.com", adresse:"1 rue André Lenormand, 14540 Grentheville" },
+    { id:"c24", code:"C00145", nom:"ROSSI Clémence", telephone:"0669441578", email:"clemence.rossi@hotmail.fr", adresse:"1 bis rue de la houllegate, 50440 BEAUMONT HAGUE" },
+    { id:"c25", code:"C00146", nom:"PELLINGHELLI Amélie", telephone:"0675696142", email:"enzopell@hotmail.fr", adresse:"12 rue de condom, 14250 Tilly sur seulle" },
+    { id:"c26", code:"C00147", nom:"PALOC Amélia", telephone:"0687681807", email:"amelia.paloc@gmail.com", adresse:"centre equestre de Kerblanquet, 56370 SARZEAU" },
+    { id:"c27", code:"C00148", nom:"GINESTY Laetitia", telephone:"0681727558", email:"laetig61@yahoo.fr", adresse:"6 clos de l'etang, 61450 LE CHATELLIER" },
+    { id:"c28", code:"C00149", nom:"ROHEE Lucie", telephone:"0683182670", email:"lucie.gohier14@gmail.com", adresse:"535E route des cretes, 61100 AUBUSSON" },
+    { id:"c29", code:"C00150", nom:"GUELTON Bruno", telephone:"0611970077", email:"bruno.guelton@orange.fr", adresse:"5 le douet , 50480 Écoquenéauville" },
+    { id:"c30", code:"C00151", nom:"GERMEYS Dominique", telephone:"0677788864", email:"laeticia.cenni@gmail.com", adresse:"la picotière, 50420 Beuvrigny" },
+    { id:"c31", code:"C00152", nom:"BREANT Sophie", telephone:"", email:"sophie.breant@peacok.net", adresse:"moulin de masson, 28120 Saint Avit les Guespières" },
+    { id:"c32", code:"C00153", nom:"FRANÇOISE Ketty", telephone:"0761442916", email:"ketty.francoise@hotmail.fr", adresse:"8 rue de l'eglise, 14700 MARTIGNY SUR L'ANTE" },
+    { id:"c33", code:"C00154", nom:"LEROY Juliette", telephone:"", email:"juliette0leroy@gmail.com", adresse:"180 la croix huet athis de l'orne, 61430 ATHIS VAL DE ROUVRE" },
+    { id:"c34", code:"C00155", nom:"BERTOZZI Isabelle", telephone:"", email:"bertozzi.isabelle@gmail.com", adresse:"20 chemin de la foligny, 61500 AUNOU sur Orne" },
+    { id:"c35", code:"C00156", nom:"ECURIE du Merisier DEBARGE Adrien", telephone:"0612957954", email:"ecuriesdumerisier@icloud.com", adresse:"831Route de courtandin, 14240 CORMOLAIN" },
+    { id:"c36", code:"C00157", nom:"LAISNEY Laure", telephone:"", email:"laurelaisney3@gmail.com", adresse:"5 rue havin, 50160 TORIGNY les Villes" },
+    { id:"c37", code:"C00158", nom:"Elevage d\'Aume", telephone:"", email:"contact@elevagedaume.fr", adresse:"14710 Formigny" },
+    { id:"c38", code:"C00159", nom:"OLIVIER Gabrielle", telephone:"", email:"omilie@hotmail.fr", adresse:"lieu dit le moulin ouf, 14490 Le TRONQUAY" },
+    { id:"c39", code:"C00160", nom:"BUSTANY Sophie", telephone:"", email:"", adresse:"" },
+    { id:"c40", code:"C00161", nom:"LETORTU Laure", telephone:"", email:"", adresse:"" },
+    { id:"c41", code:"C00162", nom:"QUINDRY Céline", telephone:"", email:"", adresse:"" },
+    { id:"c42", code:"C00163", nom:"LOLIC Sylvie", telephone:"", email:"", adresse:"" },
+    { id:"c43", code:"C00164", nom:"VANROSS Elisabeth", telephone:"", email:"", adresse:"la bonhommerie, 50190 MILLIERE" },
+    { id:"c44", code:"C00165", nom:"fab", telephone:"", email:"", adresse:"" },
+    { id:"c45", code:"C00166", nom:"LECANU Stephanie", telephone:"", email:"stephanie@jardinet.fr", adresse:"5 rue des brunelles, 14400 St Martin des entrées" },
+    { id:"c46", code:"C00167", nom:"AUBRY Justine", telephone:"", email:"justineaby11@gmail.com", adresse:"590 Avenue de la paix, 06190 Roquebrune cap martin" },
+    { id:"c47", code:"C00168", nom:"DOURNON Linda", telephone:"", email:"linda@dournon.com", adresse:"5 route des roques, 50490 La ronde haye St sauveur village" },
+    { id:"c48", code:"C00169", nom:"COUÉ Elodie", telephone:"0617504287", email:"elodie.coue@sfr.fr", adresse:"7b rue de la dîme, 14700 MARTIGNY SUR L'ANTE" },
+    { id:"c49", code:"C00170", nom:"Chauvière auvray Lison", telephone:"0627422737", email:"mathildeauvray@yahoo.fr", adresse:"la bardouliere, 61100 LANDIGOU" },
+    { id:"c50", code:"C00171", nom:"DERAINE Daniel El", telephone:"0750404077", email:"batistederaine@gmail.com", adresse:"12 voie de l'epine, 14610 Fontaine Henry" },
+    { id:"c51", code:"C00172", nom:"EARL DIJS", telephone:"", email:"earldijs@gmail.com", adresse:"1230 route de cormolain, 14240 Caumont sur Aure" },
+    { id:"c52", code:"C00173", nom:"COLAS Lemire Nathalie", telephone:"0783946936", email:"nathalie.colas_lemire@unicaen.fr", adresse:"20 rue des jardins, 14740 Thue et Mue" },
+    { id:"c53", code:"C00174", nom:"BALLIERE Aurore", telephone:"0666206996", email:"adechabot@hotmail.com", adresse:"33 rue jules dalou, 92240 MALAKOFF" },
+    { id:"c54", code:"C00175", nom:"OCHI Chritine", telephone:"0682645685", email:"contact.ochi@laposte.net", adresse:"7 rue de la tuilerie, 28630  Le COUDRAY" },
+    { id:"c55", code:"C00176", nom:"AULLEN Françoise", telephone:"", email:"franzy68@gmail.com", adresse:"1 venelle du chene, 14690 Pont D'Ouilly" },
+    { id:"c56", code:"C00177", nom:"TOURNIER Manuela", telephone:"0632814752", email:"manuela.tournier@hotmail.com", adresse:"1525 route de vauquelin La boutinière, 61210 Putanges-le-Lac" },
+    { id:"c57", code:"C00178", nom:"TARENTOLA Hélène", telephone:"0650206317", email:"h.tarentola@gmail.com", adresse:"6 rue Emilie vicq, 61100 FLERS" },
+    { id:"c58", code:"C00179", nom:"DELAHAYE Marion", telephone:"", email:"mdelahaye55@gmail.com", adresse:"1 lieu dit chatignou la carneille, 61100  ATHIS VAL DE ROUVRE" },
+    { id:"c59", code:"C00180", nom:"GAUQUELIN Jean luc", telephone:"", email:"jean-luc.gauquelin@orange.fr", adresse:"102 chemin du moulin, 14250 CHOUAIN" },
+    { id:"c60", code:"C00181", nom:"LE BERRE Fanny", telephone:"0770019169", email:"fannyleberre90@gmail.com", adresse:"10 rue de la gare, 50190  MILLIERE" },
   ],
   chevaux: [
     { id:"h1", nom:"ervana", proprietaire:"Centre équestre de Beaurouvre", type:"Cheval", race:"", age:"", notes:"" },
@@ -1384,8 +1386,10 @@ async function loadDB() {
    ══════════════════════════════════════════ */
 
 function uid() { return Math.random().toString(36).substr(2,9); }
+function nextClientId() { const nums = DB.clients.map(c => { const m = c.id.match(/^c(\d+)$/); return m ? Number(m[1]) : 0; }); return 'c' + (Math.max(0, ...nums) + 1); }
+function nextClientCode() { const nums = DB.clients.map(c => { const m = (c.code||'').match(/^C(\d+)$/); return m ? Number(m[1]) : 0; }); return 'C' + String(Math.max(0, ...nums) + 1).padStart(5,'0'); }
 function euro(n) { return (Number(n)||0).toFixed(2) + ' €'; }
-function getClientCode(c) { const num = c.id.replace(/\D/g,''); return 'C' + String(num).padStart(5,'0'); }
+function getClientCode(c) { return c.code || 'C?????'; }
 function formatDate(d) { if(!d) return ''; const dt=new Date(d); return dt.toLocaleDateString('fr-FR'); }
 function isoDate(d) { return d ? new Date(d).toISOString().split('T')[0] : ''; }
 function today() { return new Date().toISOString().split('T')[0]; }
@@ -1786,7 +1790,7 @@ function saveClient(id) {
 
   const data = { nom: fullName, telephone:document.getElementById('m-cli-tel').value, email:document.getElementById('m-cli-email').value, adresse };
   if(id) { const i=DB.clients.findIndex(c=>c.id===id); if(i>=0) { Object.assign(DB.clients[i], data); saveItem('clients', DB.clients[i]); } }
-  else { const nc = {id:uid(), ...data}; DB.clients.push(nc); saveItem('clients', nc); }
+  else { const nc = {id:nextClientId(), code:nextClientCode(), ...data}; DB.clients.push(nc); saveItem('clients', nc); }
   closeModal(); renderClients();
 }
 
@@ -1879,7 +1883,7 @@ function renderChevaux() {
 
 function openChevalModal(id) {
   const ch = id ? DB.chevaux.find(x=>x.id===id) : null;
-  const clientOpts = DB.clients.map(c=>`<option value="${c.nom}" ${ch&&ch.proprietaire===c.nom?'selected':''}>${c.nom}</option>`).join('');
+  const clientOpts = [...DB.clients].sort((a,b)=>a.nom.localeCompare(b.nom,'fr')).map(c=>`<option value="${c.nom}" ${ch&&ch.proprietaire===c.nom?'selected':''}>${c.nom}</option>`).join('');
   openModal(ch?'Modifier le cheval':'Nouveau cheval', `
     <div class="form-group"><label class="form-label">Nom *</label><input id="m-ch-nom" value="${ch?ch.nom:''}"></div>
     <div class="form-group"><label class="form-label">Propriétaire *</label><select id="m-ch-prop"><option value="">Sélectionner un client</option>${clientOpts}</select></div>
@@ -3227,7 +3231,8 @@ function saveFacture(id) {
     const ville = document.getElementById('m-f-nc-ville') ? document.getElementById('m-f-nc-ville').value.trim() : '';
     const adresse = [rue, cp && ville ? cp + ' ' + ville : cp || ville].filter(x=>x).join(', ');
     const newClient = {
-      id: uid(),
+      id: nextClientId(),
+      code: nextClientCode(),
       nom: fullName,
       telephone: document.getElementById('m-f-nc-tel').value.trim(),
       email: document.getElementById('m-f-nc-email').value.trim(),
@@ -3704,7 +3709,8 @@ function saveRdv(id) {
     const ville = document.getElementById('m-r-nc-ville').value.trim();
     const adresse = [rue, cp && ville ? cp + ' ' + ville : cp || ville].filter(x=>x).join(', ');
     const newClient = {
-      id: uid(),
+      id: nextClientId(),
+      code: nextClientCode(),
       nom: fullName,
       telephone: document.getElementById('m-r-nc-tel').value.trim(),
       email: document.getElementById('m-r-nc-email').value.trim(),
@@ -4170,6 +4176,7 @@ function renderUrssaf() {
 function renderComparatif() {
   const y1 = Number(document.getElementById('comp-year1').value);
   const y2 = Number(document.getElementById('comp-year2').value);
+  const y3 = Number(document.getElementById('comp-year3').value);
   const allPaid = [...DB.factures.filter(f=>f.statut==='payee'), ...DB.archives];
 
   const getData = (y) => {
@@ -4179,66 +4186,68 @@ function renderComparatif() {
     const factPayees = f.length;
     return { ca, nbFact:f.length, factPayees, rdvTotal:rdvY.length, rdvEffectues:rdvY.filter(r=>r.statut==='termine').length, factMoy:f.length>0?ca/f.length:0 };
   };
-  const d1=getData(y1), d2=getData(y2);
+  const d1=getData(y1), d2=getData(y2), d3=getData(y3);
   const variation=(a,b)=>b===0?(a===0?'0%':'+100%'):((a-b)/b*100).toFixed(1)+'%';
   const vColor=(a,b)=>a>=b?'var(--success)':'var(--danger)';
   const vIcon=(a,b)=>a>=b?'📈':'📉';
 
   const months = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
   const getMonthCA = (y,m) => allPaid.filter(f=>new Date(f.date).getFullYear()===y&&new Date(f.date).getMonth()===m).reduce((s,f)=>s+(Number(f.montant)||0),0);
-  const maxCA = Math.max(...months.map((_,i)=>Math.max(getMonthCA(y1,i),getMonthCA(y2,i))),1);
+  const maxCA = Math.max(...months.map((_,i)=>Math.max(getMonthCA(y1,i),getMonthCA(y2,i),getMonthCA(y3,i))),1);
 
   document.getElementById('comparatif-content').innerHTML = `
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:24px">
       ${[
-        {label:'Chiffre d\'affaires',icon:'€',v1:euro(d1.ca),v2:euro(d2.ca),va:variation(d2.ca,d1.ca),vc:vColor(d2.ca,d1.ca),vi:vIcon(d2.ca,d1.ca)},
-        {label:'Rendez-vous effectués',icon:'📅',v1:d1.rdvEffectues,v2:d2.rdvEffectues,va:variation(d2.rdvEffectues,d1.rdvEffectues),vc:vColor(d2.rdvEffectues,d1.rdvEffectues),vi:vIcon(d2.rdvEffectues,d1.rdvEffectues)},
-        {label:'Facture moyenne',icon:'📊',v1:euro(d1.factMoy),v2:euro(d2.factMoy),va:variation(d2.factMoy,d1.factMoy),vc:vColor(d2.factMoy,d1.factMoy),vi:vIcon(d2.factMoy,d1.factMoy)},
+        {label:'Chiffre d\'affaires',icon:'€',v1:euro(d1.ca),v2:euro(d2.ca),v3:euro(d3.ca),va:variation(d3.ca,d2.ca),vc:vColor(d3.ca,d2.ca),vi:vIcon(d3.ca,d2.ca)},
+        {label:'Rendez-vous effectués',icon:'📅',v1:d1.rdvEffectues,v2:d2.rdvEffectues,v3:d3.rdvEffectues,va:variation(d3.rdvEffectues,d2.rdvEffectues),vc:vColor(d3.rdvEffectues,d2.rdvEffectues),vi:vIcon(d3.rdvEffectues,d2.rdvEffectues)},
+        {label:'Facture moyenne',icon:'📊',v1:euro(d1.factMoy),v2:euro(d2.factMoy),v3:euro(d3.factMoy),va:variation(d3.factMoy,d2.factMoy),vc:vColor(d3.factMoy,d2.factMoy),vi:vIcon(d3.factMoy,d2.factMoy)},
       ].map(k=>`
         <div class="card">
           <div style="font-size:13px;color:var(--text-light);margin-bottom:8px">${k.icon} ${k.label}</div>
           <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>${y1}</span><span style="font-weight:700">${k.v1}</span></div>
-          <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span>${y2}</span><span style="font-weight:700">${k.v2}</span></div>
-          <div style="display:flex;justify-content:space-between"><span style="color:var(--text-light)">Variation</span><span style="font-weight:700;color:${k.vc}">${k.vi} ${k.va}</span></div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px"><span>${y2}</span><span style="font-weight:700">${k.v2}</span></div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:8px"><span>${y3}</span><span style="font-weight:700">${k.v3}</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--text-light)">Var. ${y2}→${y3}</span><span style="font-weight:700;color:${k.vc}">${k.vi} ${k.va}</span></div>
         </div>
       `).join('')}
     </div>
 
     <div class="card" style="margin-bottom:24px">
       <h3 style="font-size:16px;font-weight:700;margin-bottom:16px;color:var(--accent)">Évolution mensuelle du chiffre d'affaires</h3>
-      <div style="display:flex;align-items:flex-end;gap:8px;height:250px;padding:20px 0">
+      <div style="display:flex;align-items:flex-end;gap:6px;height:250px;padding:20px 0">
         ${months.map((_,i)=>{
-          const v1=getMonthCA(y1,i), v2=getMonthCA(y2,i);
-          const h1=Math.max((v1/maxCA)*200,2), h2=Math.max((v2/maxCA)*200,2);
+          const v1=getMonthCA(y1,i), v2=getMonthCA(y2,i), v3=getMonthCA(y3,i);
+          const h1=Math.max((v1/maxCA)*200,2), h2=Math.max((v2/maxCA)*200,2), h3=Math.max((v3/maxCA)*200,2);
           return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
-            <div style="display:flex;gap:2px;align-items:flex-end;height:200px">
-              <div style="width:16px;height:${h1}px;background:#94a3b8;border-radius:3px 3px 0 0" title="${y1}: ${euro(v1)}"></div>
-              <div style="width:16px;height:${h2}px;background:var(--accent);border-radius:3px 3px 0 0" title="${y2}: ${euro(v2)}"></div>
+            <div style="display:flex;gap:1px;align-items:flex-end;height:200px">
+              <div style="width:11px;height:${h1}px;background:#94a3b8;border-radius:2px 2px 0 0" title="${y1}: ${euro(v1)}"></div>
+              <div style="width:11px;height:${h2}px;background:#60a5fa;border-radius:2px 2px 0 0" title="${y2}: ${euro(v2)}"></div>
+              <div style="width:11px;height:${h3}px;background:var(--accent);border-radius:2px 2px 0 0" title="${y3}: ${euro(v3)}"></div>
             </div>
-            <div style="font-size:11px;color:var(--text-light)">${months[i]}</div>
+            <div style="font-size:10px;color:var(--text-light)">${months[i]}</div>
           </div>`;
         }).join('')}
       </div>
       <div style="display:flex;justify-content:center;gap:20px;margin-top:8px">
         <span style="display:flex;align-items:center;gap:6px;font-size:13px"><span style="width:12px;height:12px;background:#94a3b8;border-radius:2px;display:inline-block"></span>${y1}</span>
-        <span style="display:flex;align-items:center;gap:6px;font-size:13px"><span style="width:12px;height:12px;background:var(--accent);border-radius:2px;display:inline-block"></span>${y2}</span>
+        <span style="display:flex;align-items:center;gap:6px;font-size:13px"><span style="width:12px;height:12px;background:#60a5fa;border-radius:2px;display:inline-block"></span>${y2}</span>
+        <span style="display:flex;align-items:center;gap:6px;font-size:13px"><span style="width:12px;height:12px;background:var(--accent);border-radius:2px;display:inline-block"></span>${y3}</span>
       </div>
     </div>
 
     <div class="card">
       <h3 style="font-size:16px;font-weight:700;margin-bottom:16px">Récapitulatif détaillé</h3>
       <table>
-        <thead><tr><th>Indicateur</th><th style="text-align:right">${y1}</th><th style="text-align:right">${y2}</th><th style="text-align:right">Variation</th></tr></thead>
+        <thead><tr><th>Indicateur</th><th style="text-align:right">${y1}</th><th style="text-align:right">${y2}</th><th style="text-align:right">${y3}</th><th style="text-align:right">Var. ${y2}→${y3}</th></tr></thead>
         <tbody>
           ${[
-            {l:'Chiffre d\'affaires',v1:euro(d1.ca),v2:euro(d2.ca),va:variation(d2.ca,d1.ca),vc:vColor(d2.ca,d1.ca),vi:vIcon(d2.ca,d1.ca)},
-            {l:'Nombre de factures',v1:d1.nbFact,v2:d2.nbFact,va:variation(d2.nbFact,d1.nbFact),vc:vColor(d2.nbFact,d1.nbFact),vi:vIcon(d2.nbFact,d1.nbFact)},
-            {l:'Factures payées',v1:d1.factPayees,v2:d2.factPayees,va:variation(d2.factPayees,d1.factPayees),vc:vColor(d2.factPayees,d1.factPayees),vi:vIcon(d2.factPayees,d1.factPayees)},
-            {l:'Factures payées',v1:d1.factPayees,v2:d2.factPayees,va:variation(d2.factPayees,d1.factPayees),vc:vColor(d2.factPayees,d1.factPayees),vi:vIcon(d2.factPayees,d1.factPayees)},
-            {l:'Rendez-vous total',v1:d1.rdvTotal,v2:d2.rdvTotal,va:variation(d2.rdvTotal,d1.rdvTotal),vc:vColor(d2.rdvTotal,d1.rdvTotal),vi:vIcon(d2.rdvTotal,d1.rdvTotal)},
-            {l:'RDV effectués',v1:d1.rdvEffectues,v2:d2.rdvEffectues,va:variation(d2.rdvEffectues,d1.rdvEffectues),vc:vColor(d2.rdvEffectues,d1.rdvEffectues),vi:vIcon(d2.rdvEffectues,d1.rdvEffectues)},
-            {l:'Facture moyenne',v1:euro(d1.factMoy),v2:euro(d2.factMoy),va:variation(d2.factMoy,d1.factMoy),vc:vColor(d2.factMoy,d1.factMoy),vi:vIcon(d2.factMoy,d1.factMoy)},
-          ].map(k=>`<tr><td>${k.l}</td><td style="text-align:right;font-weight:600">${k.v1}</td><td style="text-align:right;font-weight:600">${k.v2}</td><td style="text-align:right;font-weight:700;color:${k.vc}">${k.vi} ${k.va}</td></tr>`).join('')}
+            {l:'Chiffre d\'affaires',v1:euro(d1.ca),v2:euro(d2.ca),v3:euro(d3.ca),va:variation(d3.ca,d2.ca),vc:vColor(d3.ca,d2.ca),vi:vIcon(d3.ca,d2.ca)},
+            {l:'Nombre de factures',v1:d1.nbFact,v2:d2.nbFact,v3:d3.nbFact,va:variation(d3.nbFact,d2.nbFact),vc:vColor(d3.nbFact,d2.nbFact),vi:vIcon(d3.nbFact,d2.nbFact)},
+            {l:'Factures payées',v1:d1.factPayees,v2:d2.factPayees,v3:d3.factPayees,va:variation(d3.factPayees,d2.factPayees),vc:vColor(d3.factPayees,d2.factPayees),vi:vIcon(d3.factPayees,d2.factPayees)},
+            {l:'Rendez-vous total',v1:d1.rdvTotal,v2:d2.rdvTotal,v3:d3.rdvTotal,va:variation(d3.rdvTotal,d2.rdvTotal),vc:vColor(d3.rdvTotal,d2.rdvTotal),vi:vIcon(d3.rdvTotal,d2.rdvTotal)},
+            {l:'RDV effectués',v1:d1.rdvEffectues,v2:d2.rdvEffectues,v3:d3.rdvEffectues,va:variation(d3.rdvEffectues,d2.rdvEffectues),vc:vColor(d3.rdvEffectues,d2.rdvEffectues),vi:vIcon(d3.rdvEffectues,d2.rdvEffectues)},
+            {l:'Facture moyenne',v1:euro(d1.factMoy),v2:euro(d2.factMoy),v3:euro(d3.factMoy),va:variation(d3.factMoy,d2.factMoy),vc:vColor(d3.factMoy,d2.factMoy),vi:vIcon(d3.factMoy,d2.factMoy)},
+          ].map(k=>`<tr><td>${k.l}</td><td style="text-align:right;font-weight:600">${k.v1}</td><td style="text-align:right;font-weight:600">${k.v2}</td><td style="text-align:right;font-weight:600">${k.v3}</td><td style="text-align:right;font-weight:700;color:${k.vc}">${k.vi} ${k.va}</td></tr>`).join('')}
         </tbody>
       </table>
     </div>
@@ -4981,14 +4990,15 @@ async function initApp() {
 
   // Remplir les selects d'années
   const yearOpts = [2024,2025,2026,2027].map(y=>`<option value="${y}">${y}</option>`).join('');
-  ['urssaf-year','comp-year1','comp-year2'].forEach(id => {
+  ['urssaf-year','comp-year1','comp-year2','comp-year3'].forEach(id => {
     const el = document.getElementById(id);
     if(el) el.innerHTML = yearOpts;
   });
   document.getElementById('urssaf-year').value = new Date().getFullYear();
   document.getElementById('urssaf-trimestre').value = Math.ceil((new Date().getMonth()+1)/3);
-  document.getElementById('comp-year1').value = new Date().getFullYear()-1;
-  document.getElementById('comp-year2').value = new Date().getFullYear();
+  document.getElementById('comp-year1').value = new Date().getFullYear()-2;
+  document.getElementById('comp-year2').value = new Date().getFullYear()-1;
+  document.getElementById('comp-year3').value = new Date().getFullYear();
 
   renderDashboard();
 }
