@@ -3110,7 +3110,7 @@ function parsePDFText(fullText, lines) {
 
 function openFactureModal(id) {
   const f = id ? DB.factures.find(x=>x.id===id) : null;
-  const clientOpts = DB.clients.map(c=>`<option value="${c.nom}" ${f&&f.clientNom===c.nom?'selected':''}>${c.nom}</option>`).join('');
+  const clientOpts = [...DB.clients].sort((a,b)=>a.nom.localeCompare(b.nom,'fr')).map(c=>`<option value="${c.nom}" ${f&&f.clientNom===c.nom?'selected':''}>${c.nom}</option>`).join('');
   const chevalOpts = DB.chevaux.map(c=>`<option value="${c.nom}" ${f&&f.chevalNom===c.nom?'selected':''}>${c.nom} (${c.type||'?'}) — ${c.proprietaire}</option>`).join('');
   const dateVal = f ? isoDate(f.date) : today();
   const echVal = f && f.echeance ? isoDate(f.echeance) : defaultEcheance(dateVal);
