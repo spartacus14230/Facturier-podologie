@@ -1289,11 +1289,11 @@ function cleanForFirestore(item) {
   return clean;
 }
 
-// Sauvegarde ciblée d'un seul item
+// Sauvegarde ciblée d'un seul item (merge pour ne pas réécrire tout)
 function saveItem(collection, item) {
   const col = COL[collection];
   if(!col || !item || !item.id) return;
-  fsDb.collection(col).doc(String(item.id)).set(cleanForFirestore(item)).catch(err => console.error('Erreur save:', err));
+  fsDb.collection(col).doc(String(item.id)).set(cleanForFirestore(item), {merge:true}).catch(err => console.error('Erreur save:', err));
 }
 
 // Suppression ciblée
@@ -1301,6 +1301,17 @@ function deleteItem(collection, id) {
   const col = COL[collection];
   if(!col) return;
   fsDb.collection(col).doc(String(id)).delete().catch(err => console.error('Erreur delete:', err));
+}
+
+// Sauvegarde groupée (pour opérations multiples)
+function saveItems(collection, items) {
+  const col = COL[collection];
+  if(!col || !items || items.length === 0) return;
+  const batch = fsDb.batch();
+  items.forEach(item => {
+    if(item && item.id) batch.set(fsDb.collection(col).doc(String(item.id)), cleanForFirestore(item), {merge:true});
+  });
+  batch.commit().catch(err => console.error('Erreur batch save:', err));
 }
 
 // saveDB = uniquement pour migration initiale (batch write)
@@ -1332,8 +1343,11 @@ async function saveDB() {
 // Chargement depuis Firestore
 async function loadDB() {
   try {
-    // TOUJOURS charger les settings existants en premier (pour préserver logo, etc.)
-    const settingsDoc = await fsDb.collection('fwp_config').doc('settings').get();
+    // Charger settings + version en parallèle
+    const [settingsDoc, vDoc] = await Promise.all([
+      fsDb.collection('fwp_config').doc('settings').get(),
+      fsDb.collection('fwp_config').doc('_version').get()
+    ]);
     if(settingsDoc.exists) {
       const saved = settingsDoc.data();
       for(const [k,v] of Object.entries(saved)) {
@@ -1342,9 +1356,6 @@ async function loadDB() {
         }
       }
     }
-
-    // Vérifier la version
-    const vDoc = await fsDb.collection('fwp_config').doc('_version').get();
     const fbVersion = vDoc.exists ? vDoc.data().v : 0;
 
     if(fbVersion < DB_VERSION) {
@@ -1353,9 +1364,11 @@ async function loadDB() {
       return;
     }
 
-    // Charger les données depuis Firebase
-    for(const [key, col] of Object.entries(COL)) {
-      const snap = await fsDb.collection(col).get();
+    // Charger les données depuis Firebase (en parallèle)
+    const entries = Object.entries(COL);
+    const snapshots = await Promise.all(entries.map(([key, col]) => fsDb.collection(col).get()));
+    entries.forEach(([key], i) => {
+      const snap = snapshots[i];
       if(!snap.empty) {
         DB[key] = snap.docs.map(doc => {
           const data = {...doc.data(), id: doc.id};
@@ -1372,8 +1385,10 @@ async function loadDB() {
           }
           return data;
         });
+      } else {
+        DB[key] = [];
       }
-    }
+    });
     console.log('✓ Firebase: ' + DB.clients.length + ' clients, ' + DB.factures.length + ' factures');
   } catch(err) {
     console.error('Erreur Firebase:', err);
@@ -1390,7 +1405,15 @@ function nextClientId() { const nums = DB.clients.map(c => { const m = c.id.matc
 function nextClientCode() { const all = DB.clients.map(c => { const code = getClientCode(c); const m = code.match(/^C(\d+)$/); return m ? Number(m[1]) : 0; }); return 'C' + String(Math.max(0, ...all) + 1).padStart(5,'0'); }
 const CLIENT_CODES = {"Centre équestre de Beaurouvre":"C00082","Centre equestres de la Lys":"C00092","Cheuvry-Gilbert Lucie":"C00093","Van-Cleemput Cecile":"C00094","Lecocq Ilona":"C00095","SCEA du Parc Chamfray":"C00099","ARVIER Sylvie":"C00113","LAUNAY Marie christine":"C00117","GRANDJEAN Lydia":"C00123","MOREAU Marie":"C00128","Haras de Cresme":"C00132","EARL ferme de la basse BIGNETIERE":"C00133","Anne-Laure Deraine":"C00134","GUYONNET Marie":"C00135","HOUEL Marion":"C00136","FEKKAK Lydie":"C00137","GASSE Magali":"C00138","LELOUP Adeline":"C00139","SARL Académie de l'Audace":"C00140","Association La Parenthèse Verte":"C00141","ROLOT Noémie":"C00142","GUILLOUX Alicia":"C00143","Isaac Hamon":"C00144","ROSSI Clémence":"C00145","PELLINGHELLI Amélie":"C00146","PALOC Amélia":"C00147","GINESTY Laetitia":"C00148","ROHEE Lucie":"C00149","GUELTON Bruno":"C00150","GERMEYS Dominique":"C00151","BREANT Sophie":"C00152","FRANÇOISE Ketty":"C00153","LEROY Juliette":"C00154","BERTOZZI Isabelle":"C00155","ECURIE du Merisier DEBARGE Adrien":"C00156","LAISNEY Laure":"C00157","Elevage d'Aume":"C00158","OLIVIER Gabrielle":"C00159","BUSTANY Sophie":"C00160","LETORTU Laure":"C00161","QUINDRY Céline":"C00162","LOLIC Sylvie":"C00163","VANROSS Elisabeth":"C00164","fab":"C00165","LECANU Stephanie":"C00166","AUBRY Justine":"C00167","DOURNON Linda":"C00168","COUÉ Elodie":"C00169","Chauvière auvray Lison":"C00170","DERAINE Daniel El":"C00171","EARL DIJS":"C00172","COLAS Lemire Nathalie":"C00173","BALLIERE Aurore":"C00174","OCHI Chritine":"C00175","AULLEN Françoise":"C00176","TOURNIER Manuela":"C00177","TARENTOLA Hélène":"C00178","DELAHAYE Marion":"C00179","GAUQUELIN Jean luc":"C00180","LE BERRE Fanny":"C00181"};
 function euro(n) { return (Number(n)||0).toFixed(2) + ' €'; }
-function getClientCode(c) { return c.code || CLIENT_CODES[c.nom] || 'C?????'; }
+function getClientCode(c) { 
+  if(c.code) return c.code;
+  if(CLIENT_CODES[c.nom]) return CLIENT_CODES[c.nom];
+  // Fallback: recherche insensible à la casse et aux apostrophes
+  const normalize = s => (s||'').toLowerCase().replace(/[\u2019\u2018'`]/g, "'");
+  const nomN = normalize(c.nom);
+  for(const [k,v] of Object.entries(CLIENT_CODES)) { if(normalize(k) === nomN) return v; }
+  return 'C?????';
+}
 function formatDate(d) { if(!d) return ''; const dt=new Date(d); return dt.toLocaleDateString('fr-FR'); }
 function isoDate(d) { return d ? new Date(d).toISOString().split('T')[0] : ''; }
 function today() { return new Date().toISOString().split('T')[0]; }
