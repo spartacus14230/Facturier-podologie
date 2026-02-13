@@ -448,7 +448,7 @@ body.dark .login-input { background:#111827; color:#f3f4f6; border-color:#374151
   <div class="card" style="padding:0;overflow:hidden">
     <table>
       <thead><tr>
-        <th>Nom</th><th>Téléphone</th><th>Email</th><th>Chevaux</th><th>Adresse</th><th style="text-align:right">Actions</th>
+        <th>Code</th><th>Nom</th><th>Téléphone</th><th>Email</th><th>Chevaux</th><th>Adresse</th><th style="text-align:right">Actions</th>
       </tr></thead>
       <tbody id="clients-tbody"></tbody>
     </table>
@@ -1385,6 +1385,7 @@ async function loadDB() {
 
 function uid() { return Math.random().toString(36).substr(2,9); }
 function euro(n) { return (Number(n)||0).toFixed(2) + ' €'; }
+function getClientCode(c) { const num = c.id.replace(/\D/g,''); return 'C' + String(num).padStart(5,'0'); }
 function formatDate(d) { if(!d) return ''; const dt=new Date(d); return dt.toLocaleDateString('fr-FR'); }
 function isoDate(d) { return d ? new Date(d).toISOString().split('T')[0] : ''; }
 function today() { return new Date().toISOString().split('T')[0]; }
@@ -1664,6 +1665,7 @@ function renderClients() {
     }
     const addr = c.adresse ? encodeURIComponent(c.adresse) : '';
     return `<tr>
+      <td><span style="font-family:monospace;font-size:12px;color:var(--text-light);font-weight:600">${getClientCode(c)}</span></td>
       <td><div style="display:flex;align-items:center;gap:10px"><div class="initial" style="background:${initialColor(getInitial(c.nom))}">${getInitial(c.nom)}</div><span style="font-weight:600">${c.nom}</span></div></td>
       <td>${c.telephone?'📞 '+c.telephone:''}</td>
       <td>${c.email?'✉️ '+c.email:''}</td>
@@ -1807,7 +1809,7 @@ function viewClientFiche(id) {
     <div class="modal-header"><h2>Fiche client</h2><button class="icon-btn" onclick="closeViewModal()">✕</button></div>
     <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px">
       <div class="initial" style="width:56px;height:56px;font-size:22px;background:${initialColor(getInitial(c.nom))}">${getInitial(c.nom)}</div>
-      <div><div style="font-size:20px;font-weight:700">${c.nom}</div><div style="font-size:13px;color:var(--text-light)">${c.email||'Pas d\'email'}</div></div>
+      <div><div style="font-size:20px;font-weight:700">${c.nom}</div><div style="font-size:13px;color:var(--text-light)">${getClientCode(c)} • ${c.email||'Pas d\'email'}</div></div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
       <div style="padding:12px;background:var(--bg);border-radius:8px"><div style="font-size:11px;color:var(--text-light)">📞 Téléphone</div><div style="font-weight:600">${c.telephone||'Non renseigné'}</div></div>
@@ -2236,8 +2238,8 @@ function downloadFacture(id, returnData) {
   doc.setTextColor(...TEXT);
   doc.setFontSize(8);
   doc.setFont('helvetica','bold');
-  const cNum = client ? client.id.replace(/\D/g,'') : '0';
-  doc.text('Code client : C' + String(cNum).padStart(5,'0'), CX + CPad + 3, CY + 34);
+  const clientCode = client ? getClientCode(client) : 'C00000';
+  doc.text('Code client : ' + clientCode, CX + CPad + 3, CY + 34);
 
   // ═══════════════════════════════════════
   // TABLEAU DES PRESTATIONS
@@ -4529,7 +4531,7 @@ function connectGoogleCalendar() {
   const clientId = DB.settings.gcalClientId;
   if(!clientId) {
     alert('⚠ Configurez d\'abord votre Google Client ID dans Paramètres → Google Agenda');
-    showPage('parametres');
+    navigateTo('parametres');
     return;
   }
   if(typeof google === 'undefined' || !google.accounts?.oauth2) {
