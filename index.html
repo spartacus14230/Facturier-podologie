@@ -1739,8 +1739,10 @@ function openClientModal(id) {
       rueVal = c.adresse;
     }
   }
+  const currentCode = c ? getClientCode(c) : nextClientCode();
   openModal(c?'Modifier le client':'Nouveau client', `
-    <div class="form-row">
+    <div class="form-row" style="grid-template-columns:160px 1fr 1fr">
+      <div class="form-group"><label class="form-label">N° Client</label><input id="m-cli-code" value="${currentCode}" style="font-family:monospace;font-weight:700;letter-spacing:1px"></div>
       <div class="form-group"><label class="form-label">Nom de famille *</label><input id="m-cli-nom" value="${nomVal}" placeholder="NOM" style="text-transform:uppercase"></div>
       <div class="form-group"><label class="form-label">Prénom</label><input id="m-cli-prenom" value="${prenomVal}" placeholder="Prénom"></div>
     </div>
@@ -1812,9 +1814,10 @@ function saveClient(id) {
   const ville = document.getElementById('m-cli-ville') ? document.getElementById('m-cli-ville').value.trim() : '';
   const adresse = [rue, cp && ville ? cp + ' ' + ville : cp || ville].filter(x=>x).join(', ');
 
-  const data = { nom: fullName, telephone:document.getElementById('m-cli-tel').value, email:document.getElementById('m-cli-email').value, adresse };
+  const codeVal = document.getElementById('m-cli-code').value.trim();
+  const data = { nom: fullName, code: codeVal, telephone:document.getElementById('m-cli-tel').value, email:document.getElementById('m-cli-email').value, adresse };
   if(id) { const i=DB.clients.findIndex(c=>c.id===id); if(i>=0) { Object.assign(DB.clients[i], data); saveItem('clients', DB.clients[i]); } }
-  else { const nc = {id:nextClientId(), code:nextClientCode(), ...data}; DB.clients.push(nc); saveItem('clients', nc); }
+  else { const nc = {id:nextClientId(), ...data}; DB.clients.push(nc); saveItem('clients', nc); }
   closeModal(); renderClients();
 }
 
