@@ -4248,6 +4248,11 @@ function renderComparatif() {
             {l:'RDV effectués',v1:d1.rdvEffectues,v2:d2.rdvEffectues,v3:d3.rdvEffectues,va:variation(d3.rdvEffectues,d2.rdvEffectues),vc:vColor(d3.rdvEffectues,d2.rdvEffectues),vi:vIcon(d3.rdvEffectues,d2.rdvEffectues)},
             {l:'Facture moyenne',v1:euro(d1.factMoy),v2:euro(d2.factMoy),v3:euro(d3.factMoy),va:variation(d3.factMoy,d2.factMoy),vc:vColor(d3.factMoy,d2.factMoy),vi:vIcon(d3.factMoy,d2.factMoy)},
           ].map(k=>`<tr><td>${k.l}</td><td style="text-align:right;font-weight:600">${k.v1}</td><td style="text-align:right;font-weight:600">${k.v2}</td><td style="text-align:right;font-weight:600">${k.v3}</td><td style="text-align:right;font-weight:700;color:${k.vc}">${k.vi} ${k.va}</td></tr>`).join('')}
+          <tr><td colspan="5" style="padding:12px 0 6px;font-weight:700;color:var(--accent);border-bottom:2px solid var(--accent)">📅 Détail mensuel (CA)</td></tr>
+          ${['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'].map((m,i)=>{
+            const mv1=getMonthCA(y1,i), mv2=getMonthCA(y2,i), mv3=getMonthCA(y3,i);
+            return '<tr style="background:'+(i%2===0?'var(--bg)':'transparent')+'"><td style="padding-left:16px">'+m+'</td><td style="text-align:right">'+euro(mv1)+'</td><td style="text-align:right">'+euro(mv2)+'</td><td style="text-align:right">'+euro(mv3)+'</td><td style="text-align:right;font-weight:600;color:'+vColor(mv3,mv2)+'">'+vIcon(mv3,mv2)+' '+variation(mv3,mv2)+'</td></tr>';
+          }).join('')}
         </tbody>
       </table>
     </div>
