@@ -4959,131 +4959,24 @@ async function fullSyncGoogleCalendar() {
     const timeMin = new Date(now.getFullYear(), now.getMonth() - 3, 1);
     const timeMax = new Date(now.getFullYear(), now.getMonth() + 4, 0);
 
-    // 1) Récupérer les événements Google
+    // Récupérer les événements Google
     const googleEvents = await getGoogleEvents(timeMin, timeMax);
     console.log('📅 Google Calendar: ' + googleEvents.length + ' événements récupérés');
 
-    let imported = 0, updated = 0, pushed = 0, skipped = 0;
-
-    // 2) GOOGLE → APP : Importer/Mettre à jour
-    showGcalStatus('⏳ Import depuis Google... (' + googleEvents.length + ' événements)', 'loading');
-    
-    // Index rapide pour les lookups
-    const rdvByFwpId = new Map(DB.rdv.map(r => [r.id, r]));
-    const rdvByGoogleId = new Map(DB.rdv.filter(r => r.googleEventId).map(r => [r.googleEventId, r]));
-
-    for(const event of googleEvents) {
-      if(event.status === 'cancelled') continue;
-
-      const fwpId = extractFwpId(event.description);
-
-      if(fwpId) {
-        const existingRdv = rdvByFwpId.get(fwpId);
-        if(existingRdv && !existingRdv.googleEventId) {
-          existingRdv.googleEventId = event.id;
-          saveItem('rdv', existingRdv);
-        }
-        skipped++;
-        continue;
-      }
-
-      const existingByGoogleId = rdvByGoogleId.get(event.id);
-      if(existingByGoogleId) {
-        const parsed = parseGoogleEventToRdv(event);
-        let changed = false;
-        if(parsed.date !== existingByGoogleId.date) { existingByGoogleId.date = parsed.date; changed = true; }
-        if(parsed.heure !== existingByGoogleId.heure) { existingByGoogleId.heure = parsed.heure; changed = true; }
-        if(parsed.duree !== existingByGoogleId.duree) { existingByGoogleId.duree = parsed.duree; changed = true; }
-        if(parsed.client !== existingByGoogleId.client && !DB.clients.find(c => c.nom === existingByGoogleId.client)) {
-          existingByGoogleId.client = parsed.client; changed = true;
-        }
-        if(parsed.adresse && parsed.adresse !== existingByGoogleId.adresse) { existingByGoogleId.adresse = parsed.adresse; changed = true; }
-        if(changed) {
-          saveItem('rdv', existingByGoogleId);
-          updated++;
-        } else {
-          skipped++;
-        }
-        continue;
-      }
-
-      // Nouveau: importer
-      const rdvData = parseGoogleEventToRdv(event);
-      if(!rdvData.date) continue;
-      
-      const knownClient = DB.clients.find(c => {
-        const cNorm = c.nom.toLowerCase();
-        const rNorm = rdvData.client.toLowerCase();
-        return cNorm === rNorm || cNorm.includes(rNorm) || rNorm.includes(cNorm);
-      });
-      if(knownClient) rdvData.client = knownClient.nom;
-
-      const newRdv = { id: uid(), ...rdvData };
-      DB.rdv.push(newRdv);
-      saveItem('rdv', newRdv);
-      imported++;
-    }
-
-    // 3) APP → GOOGLE : Pousser les RDV — seulement ceux qui en ont besoin
-    const googleEventIds = new Set(googleEvents.map(e => e.id));
-    const rdvInRange = DB.rdv.filter(r => {
-      const d = new Date(r.date);
-      return d >= timeMin && d <= timeMax;
-    });
-
-    // Séparer : à créer vs à mettre à jour (seulement si pas trouvé sur Google = supprimé)
-    const toCreate = [];
-    const toUpdate = [];
-    
-    for(const rdv of rdvInRange) {
-      if(!rdv.googleEventId) {
-        toCreate.push(rdv);
-      } else if(!googleEventIds.has(rdv.googleEventId)) {
-        // L'événement n'existe plus sur Google → recréer
-        rdv.googleEventId = null;
-        toCreate.push(rdv);
-      }
-      // Si googleEventId existe ET est dans googleEvents → déjà synchro, on ne touche pas
-    }
-
-    const totalPush = toCreate.length + toUpdate.length;
-    if(totalPush > 0) {
-      showGcalStatus('⏳ Envoi vers Google... 0/' + totalPush, 'loading');
-    }
-
-    // Traitement par lots de 5 en parallèle
-    let done = 0;
-    const processBatch = async (items, handler) => {
-      for(let i = 0; i < items.length; i += 5) {
-        const batch = items.slice(i, i + 5);
-        await Promise.allSettled(batch.map(handler));
-        done += batch.length;
-        if(totalPush > 0) {
-          showGcalStatus('⏳ Envoi vers Google... ' + done + '/' + totalPush, 'loading');
-        }
-      }
-    };
-
-    await processBatch(toCreate, async (rdv) => {
-      try {
-        const created = await createGoogleEvent(rdv);
-        rdv.googleEventId = created.id;
-        saveItem('rdv', rdv);
-        pushed++;
-      } catch(e) {
-        console.error('Erreur push RDV:', rdv.id, e);
-      }
-    });
-
-    // 4) Stocker TOUS les événements Google pour l'affichage calendrier
+    // Stocker TOUS les événements Google pour l'affichage calendrier (copie fidèle)
     DB.gcalEvents = googleEvents.filter(e => e.status !== 'cancelled').map(e => {
-      let date = '', endDate = '', heure = '', allDay = false;
+      let date = '', endDate = '', heure = '', heureFin = '', allDay = false;
       if(e.start?.dateTime) {
         const dt = new Date(e.start.dateTime);
         date = dt.toISOString().split('T')[0];
         heure = String(dt.getHours()).padStart(2,'0') + ':' + String(dt.getMinutes()).padStart(2,'0');
-        if(e.end?.dateTime) endDate = new Date(e.end.dateTime).toISOString().split('T')[0];
-        else endDate = date;
+        if(e.end?.dateTime) {
+          const dtEnd = new Date(e.end.dateTime);
+          endDate = dtEnd.toISOString().split('T')[0];
+          heureFin = String(dtEnd.getHours()).padStart(2,'0') + ':' + String(dtEnd.getMinutes()).padStart(2,'0');
+        } else {
+          endDate = date;
+        }
       } else if(e.start?.date) {
         date = e.start.date;
         endDate = e.end?.date || date;
@@ -5100,24 +4993,19 @@ async function fullSyncGoogleCalendar() {
         date: date,
         endDate: endDate || date,
         heure: heure,
+        heureFin: heureFin,
         allDay: allDay,
         colorId: e.colorId || '0',
-        location: e.location || ''
+        location: e.location || '',
+        description: e.description || ''
       };
     });
 
-    // 5) Rafraîchir l'affichage
-    renderRdv();
+    // Rafraîchir l'affichage
     renderAgenda();
 
-    const msg = [];
-    if(imported > 0) msg.push('📥 ' + imported + ' importé(s) de Google');
-    if(updated > 0) msg.push('🔄 ' + updated + ' mis à jour');
-    if(pushed > 0) msg.push('📤 ' + pushed + ' envoyé(s) vers Google');
-    if(msg.length === 0) msg.push('✓ Tout est déjà synchronisé');
-
-    showGcalStatus('✅ Synchronisation terminée ! ' + msg.join(' • '), 'success');
-    console.log('✓ Sync Google Calendar:', msg.join(', '));
+    showGcalStatus('✅ ' + DB.gcalEvents.length + ' événements récupérés de Google Calendar', 'success');
+    console.log('✓ Google Calendar: ' + DB.gcalEvents.length + ' événements affichés');
 
     DB.settings.lastGcalSync = new Date().toISOString();
 
