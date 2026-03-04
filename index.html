@@ -2362,7 +2362,7 @@ function downloadFacture(id, returnData) {
   doc.setFontSize(9);
   doc.setFont('helvetica','normal');
   doc.setTextColor(...ACCENT);
-  doc.text('Podologie équine professionnelle', nameX, 27);
+  doc.text('Podologie équine', nameX, 27);
 
   // FACTURE N° dans le header (droite)
   doc.setTextColor(...WHITE);
@@ -2532,6 +2532,34 @@ function downloadFacture(id, returnData) {
   doc.setDrawColor(...DARK);
   doc.setLineWidth(0.4);
   doc.line(TL, yRow, TR, yRow);
+
+  // ═══════════════════════════════════════
+  // BANDEAU ÉQUIDÉS (masqué si aucun cheval)
+  // ═══════════════════════════════════════
+  if(f.chevalNom && f.chevalNom.trim()) {
+    const bandY = yRow + 3;
+    const bandH = 10;
+    const bandL = M, bandR = R, bandW = bandR - bandL;
+    // Fond léger crème
+    doc.setFillColor(254, 243, 226);
+    doc.roundedRect(bandL, bandY, bandW, bandH, 1.5, 1.5, 'F');
+    // Barre dorée à gauche
+    doc.setFillColor(...ACCENT);
+    doc.rect(bandL, bandY, 1.5, bandH, 'F');
+    // Label
+    doc.setFontSize(7.5);
+    doc.setFont('helvetica','bold');
+    doc.setTextColor(...ACCENT);
+    doc.text('ÉQUIDÉS CONCERNÉS', bandL + 5, bandY + 6.5);
+    // Noms des chevaux
+    doc.setFontSize(8.5);
+    doc.setFont('helvetica','normal');
+    doc.setTextColor(...TEXT);
+    const chevauxStr = f.chevalNom.split(', ').map(n => n.trim()).filter(n => n).join('  ·  ');
+    doc.text(chevauxStr, bandL + 45, bandY + 6.5);
+    // Décaler le reste vers le bas
+    yRow += bandH + 4;
+  }
 
   // ═══════════════════════════════════════
   // BLOC TOTAUX (droite, sous le tableau)
@@ -3123,7 +3151,7 @@ function parsePDFText(fullText, lines) {
 function openFactureModal(id) {
   const f = id ? DB.factures.find(x=>x.id===id) : null;
   const clientOpts = [...DB.clients].sort((a,b)=>a.nom.localeCompare(b.nom,'fr')).map(c=>`<option value="${c.nom}" ${f&&f.clientNom===c.nom?'selected':''}>${c.nom}</option>`).join('');
-  const chevalOpts = DB.chevaux.map(c=>`<option value="${c.nom}" ${f&&f.chevalNom===c.nom?'selected':''}>${c.nom} (${c.type||'?'}) — ${c.proprietaire}</option>`).join('');
+  const chevalOpts = ''; // peuplé dynamiquement par refreshChevalSelect()
   const dateVal = f ? isoDate(f.date) : today();
   const echVal = f && f.echeance ? isoDate(f.echeance) : defaultEcheance(dateVal);
   const numVal = f ? f.numero : nextFactureNum();
@@ -3169,22 +3197,27 @@ function openFactureModal(id) {
     </div>
 
     <div style="border-bottom:1px solid var(--border);padding-bottom:16px;margin-bottom:16px">
-      <div style="font-weight:700;color:var(--accent);margin-bottom:12px">🐴 Cheval</div>
-      <div class="form-group">
-        <label class="form-label">Sélectionner un cheval existant</label>
-        <select id="m-f-cheval" onchange="onFactureChevalChange()"><option value="">-- Aucun / Nouveau --</option>${chevalOpts}</select>
+      <div style="font-weight:700;color:var(--accent);margin-bottom:12px">🐴 Chevaux</div>
+      <div style="display:flex;gap:8px;align-items:end;margin-bottom:8px">
+        <div style="flex:1">
+          <label class="form-label" style="font-size:12px">Sélectionner un cheval existant</label>
+          <select id="m-f-cheval"><option value="">-- Sélectionner --</option>${chevalOpts}</select>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="addChevalToFacture()" style="white-space:nowrap">＋ Ajouter</button>
       </div>
+      <div id="m-f-chevaux-list" style="margin-bottom:8px"></div>
       <div id="m-f-new-cheval" style="background:var(--bg);border-radius:8px;padding:12px;margin-top:8px">
         <div style="font-size:12px;color:var(--text-light);margin-bottom:8px">Ou ajouter un nouveau cheval :</div>
-        <div class="form-row">
-          <div class="form-group"><label class="form-label" style="font-size:12px">Nom du cheval</label><input type="text" id="m-f-nch-nom" placeholder="Nom" style="font-size:13px" value="${f&&f.chevalNom&&!DB.chevaux.find(c=>c.nom===f.chevalNom)?f.chevalNom:''}"></div>
-          <div class="form-group"><label class="form-label" style="font-size:12px">Type</label><select id="m-f-nch-type" style="font-size:13px">
+        <div style="display:flex;gap:8px;align-items:end">
+          <div class="form-group" style="flex:1;margin:0"><label class="form-label" style="font-size:12px">Nom</label><input type="text" id="m-f-nch-nom" placeholder="Nom" style="font-size:13px"></div>
+          <div class="form-group" style="width:140px;margin:0"><label class="form-label" style="font-size:12px">Type</label><select id="m-f-nch-type" style="font-size:13px">
             <option value="">-- Type --</option>
             <option value="Cheval">Cheval</option>
             <option value="Poney (AB)">Poney (AB)</option>
             <option value="Poney (CD)">Poney (CD)</option>
             <option value="Âne">Âne</option>
           </select></div>
+          <button class="btn btn-secondary btn-sm" onclick="addNewChevalToFacture()" style="white-space:nowrap">＋ Nouveau</button>
         </div>
       </div>
     </div>
@@ -3266,10 +3299,18 @@ function openFactureModal(id) {
 
   // Afficher les infos du client si déjà sélectionné
   if(f && f.clientNom) onFactureClientChange();
+  else refreshChevalSelect();
   // Masquer nouveau cheval si existant sélectionné
-  if(f && f.chevalNom && DB.chevaux.find(c=>c.nom===f.chevalNom)) {
-    document.getElementById('m-f-new-cheval').style.display = 'none';
+  _factureChevaux = [];
+  if(f && f.chevalNom) {
+    // Rétrocompatibilité : chevalNom peut contenir un ou plusieurs noms séparés par ", "
+    const noms = f.chevalNom.split(', ').map(n=>n.trim()).filter(n=>n);
+    noms.forEach(nom => {
+      const ch = DB.chevaux.find(c=>c.nom===nom);
+      _factureChevaux.push({ nom, type: ch ? ch.type : '', proprietaire: ch ? ch.proprietaire : '' });
+    });
   }
+  renderFactureChevaux();
 
   // Rendu des lignes
   renderLignesFacture();
@@ -3294,13 +3335,75 @@ function onFactureClientChange() {
     infoDiv.style.display = 'none';
     newDiv.style.display = 'block';
   }
+  refreshChevalSelect();
 }
 
-function onFactureChevalChange() {
-  const val = document.getElementById('m-f-cheval').value;
-  const newDiv = document.getElementById('m-f-new-cheval');
-  newDiv.style.display = val ? 'none' : 'block';
-  if(!val) { document.getElementById('m-f-nch-nom').value=''; document.getElementById('m-f-nch-type').value=''; }
+function refreshChevalSelect() {
+  const sel = document.getElementById('m-f-cheval');
+  if(!sel) return;
+  const clientNom = (document.getElementById('m-f-client') || {}).value || '';
+  const sortAlpha = (a, b) => a.nom.localeCompare(b.nom, 'fr');
+  const chevauxClient = [...DB.chevaux].filter(c => clientNom && c.proprietaire === clientNom).sort(sortAlpha);
+  const chevauxAutres = [...DB.chevaux].filter(c => !clientNom || c.proprietaire !== clientNom).sort(sortAlpha);
+  let html = '<option value="">-- Sélectionner --</option>';
+  if(chevauxClient.length > 0) {
+    html += `<optgroup label="🐴 Chevaux de ${clientNom}">`;
+    chevauxClient.forEach(c => { html += `<option value="${c.nom}">${c.nom} (${c.type||'?'})</option>`; });
+    html += '</optgroup>';
+  }
+  if(chevauxAutres.length > 0) {
+    html += `<optgroup label="Autres chevaux">`;
+    chevauxAutres.forEach(c => { html += `<option value="${c.nom}">${c.nom} (${c.type||'?'}) — ${c.proprietaire}</option>`; });
+    html += '</optgroup>';
+  }
+  sel.innerHTML = html;
+}
+
+function addChevalToFacture() {
+  const sel = document.getElementById('m-f-cheval');
+  const nom = sel.value;
+  if(!nom) return;
+  if(_factureChevaux.find(c=>c.nom===nom)) { sel.value=''; return; } // déjà ajouté
+  const ch = DB.chevaux.find(c=>c.nom===nom);
+  _factureChevaux.push({ nom, type: ch ? ch.type : '', proprietaire: ch ? ch.proprietaire : '' });
+  sel.value = '';
+  renderFactureChevaux();
+}
+
+function addNewChevalToFacture() {
+  const nomEl = document.getElementById('m-f-nch-nom');
+  const typeEl = document.getElementById('m-f-nch-type');
+  const nom = nomEl.value.trim();
+  if(!nom) return alert('⚠ Entrez le nom du cheval');
+  if(_factureChevaux.find(c=>c.nom.toLowerCase()===nom.toLowerCase())) { nomEl.value=''; typeEl.value=''; return; }
+  const type = typeEl.value || 'Cheval';
+  const clientNom = document.getElementById('m-f-client').value || '';
+  _factureChevaux.push({ nom, type, proprietaire: clientNom, isNew: true });
+  nomEl.value = ''; typeEl.value = '';
+  renderFactureChevaux();
+}
+
+function removeChevalFromFacture(idx) {
+  _factureChevaux.splice(idx, 1);
+  renderFactureChevaux();
+}
+
+function renderFactureChevaux() {
+  const container = document.getElementById('m-f-chevaux-list');
+  if(!container) return;
+  if(_factureChevaux.length === 0) {
+    container.innerHTML = '<div style="text-align:center;padding:8px;color:var(--text-light);font-size:12px;background:var(--bg);border-radius:8px">Aucun cheval sélectionné</div>';
+    return;
+  }
+  container.innerHTML = _factureChevaux.map((c, i) => {
+    const typeIcon = (c.type||'').includes('Poney') ? '🐎' : c.type === 'Âne' ? '🫏' : '🐴';
+    return `<div style="display:inline-flex;align-items:center;gap:6px;background:var(--accent-light,#fef3e2);border:1px solid var(--accent);border-radius:20px;padding:4px 10px 4px 8px;margin:0 6px 6px 0;font-size:13px">
+      <span>${typeIcon}</span>
+      <span style="font-weight:600">${c.nom}</span>
+      ${c.type?'<span style="font-size:11px;color:var(--text-light)">('+c.type+')</span>':''}
+      <button onclick="removeChevalFromFacture(${i})" style="background:none;border:none;cursor:pointer;color:#c00;font-size:16px;padding:0 0 0 4px;line-height:1" title="Retirer">✕</button>
+    </div>`;
+  }).join('');
 }
 
 function autoEcheance() {
@@ -3311,6 +3414,7 @@ function autoEcheance() {
 
 // === GESTION LIGNES FACTURE (base produit) ===
 let _factureLignes = [];
+let _factureChevaux = []; // [{nom, type, proprietaire}]
 
 function buildPrestationOptions() {
   const cats = {};
@@ -3447,24 +3551,16 @@ function saveFacture(id) {
     clientNom = fullName;
   }
 
-  // === CHEVAL ===
-  let chevalNom = document.getElementById('m-f-cheval').value;
-  if(!chevalNom) {
-    const nchNom = document.getElementById('m-f-nch-nom').value.trim();
-    const nchType = document.getElementById('m-f-nch-type').value;
-    if(nchNom) {
-      if(!DB.chevaux.find(c=>c.nom.toLowerCase()===nchNom.toLowerCase())) {
-        DB.chevaux.push({
-          id: uid(),
-          nom: nchNom,
-          proprietaire: clientNom,
-          type: nchType || 'Cheval',
-          race: '', age: '', notes: ''
-        });
-      }
-      chevalNom = nchNom;
+  // === CHEVAL (multi) ===
+  // Créer les nouveaux chevaux si nécessaire
+  _factureChevaux.forEach(ch => {
+    if(ch.isNew && !DB.chevaux.find(c=>c.nom.toLowerCase()===ch.nom.toLowerCase())) {
+      const newCh = { id: uid(), nom: ch.nom, proprietaire: ch.proprietaire || clientNom, type: ch.type || 'Cheval', race: '', age: '', notes: '' };
+      DB.chevaux.push(newCh);
+      saveItem('chevaux', newCh);
     }
-  }
+  });
+  const chevalNom = _factureChevaux.map(c=>c.nom).join(', ');
 
   // === SAUVEGARDE ===
   const lignes = _factureLignes.map(l => ({desc:l.desc, qty:Number(l.qty)||0, prix:Number(l.prix)||0}));
@@ -3499,7 +3595,7 @@ function saveFacture(id) {
   // Sauver aussi le nouveau client/cheval si créés
   const newCli = DB.clients.find(c => c.nom === clientNom);
   if(newCli) saveItem('clients', newCli);
-  if(chevalNom) { const newCh = DB.chevaux.find(c => c.nom === chevalNom); if(newCh) saveItem('chevaux', newCh); }
+  if(chevalNom) { _factureChevaux.forEach(ch => { const dbCh = DB.chevaux.find(c => c.nom === ch.nom); if(dbCh) saveItem('chevaux', dbCh); }); }
 
   window._importingFactureId = null;
   closeModal(); renderFactures(); renderClients(); renderChevaux();
