@@ -2784,9 +2784,8 @@ async function sendFactureByEmail(id) {
       '\r\n' +
       '--' + boundary + '--';
 
-    // 4. Encoder en base64 URL-safe pour Gmail API
-    // On convertit chaque caractere en byte (ASCII safe car on a retire les accents)
-    const rawMessage = btoa(mime)
+    // 4. Encoder en base64 URL-safe pour Gmail API (UTF-8 safe)
+    const rawMessage = btoa(unescape(encodeURIComponent(mime)))
       .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
     // 5. Envoyer via Gmail API
